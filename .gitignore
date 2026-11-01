@@ -1,0 +1,6 @@
+dist/
+node_modules/
+.wrangler/
+.env
+.env.*
+supabase/functions/.env

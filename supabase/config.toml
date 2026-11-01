@@ -1,0 +1,7 @@
+project_id = "cmclojrcwjrfezoaidzw"
+
+[functions.vigia-ingest]
+verify_jwt = false
+
+[functions.vigia-verification]
+verify_jwt = true

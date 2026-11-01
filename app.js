@@ -19,6 +19,7 @@
   const authButton = document.getElementById("auth-button");
   const domainStep = document.getElementById("domain-step");
   const verificationStep = document.getElementById("verification-step");
+  const trackingStep = document.getElementById("tracking-step");
   const modalTitle = document.getElementById("modal-title");
   const modalIntro = document.getElementById("modal-intro");
   const modalProgress = document.getElementById("modal-progress");
@@ -34,6 +35,7 @@
   let authSession = null;
   let userSites = [];
   let activeSiteId = null;
+  let pendingSiteId = null;
   let pendingDomain = "";
   let lastPresenceSiteId = null;
   let knownVisitorIds = new Set();
@@ -120,6 +122,7 @@
       if (response.status === 401 && authSession) clearSession();
       const error = new Error(responseData?.msg || responseData?.message || responseData?.error_description || `Supabase retornou HTTP ${response.status}.`);
       error.status = response.status;
+      error.code = responseData?.code;
       throw error;
     }
     return responseData;
@@ -371,7 +374,7 @@
     knownVisitorIds = currentVisitorIds;
     lastPresenceSiteId = site.id;
     visitorRows.replaceChildren();
-    if (!visitors.length) renderEmptyVisitors("Nenhum visitante ativo. A coleta depende do snippet e do endpoint seguro.");
+    if (!visitors.length) renderEmptyVisitors("Nenhum visitante ativo no momento.");
     visitors.forEach((visitor) => {
       const row = document.createElement("tr");
       const location = document.createElement("td");
@@ -412,10 +415,10 @@
     const notice = document.querySelector(".demo-notice");
     notice.hidden = false;
     notice.querySelector("p").textContent = site.verified_at
-      ? "Site conectado; ainda não há eventos. Configure o snippet e o endpoint seguro para iniciar a coleta."
+      ? "Domínio verificado. Instale o snippet para iniciar a coleta de acessos reais."
       : "Site registrado, mas ainda não verificado. A ingestão só poderá ser ativada após confirmar o domínio.";
     notice.querySelector(".notice-link").hidden = !site.verified_at;
-    notice.querySelector(".notice-link").textContent = "Ver instruções";
+    notice.querySelector(".notice-link").textContent = "Ver snippet";
   };
 
   const loadSiteAnalytics = async (site, { notifyNewVisitors = false } = {}) => {
@@ -605,6 +608,7 @@
   const showDomainStep = () => {
     domainStep.hidden = false;
     verificationStep.hidden = true;
+    trackingStep.hidden = true;
     modalTitle.textContent = "Vamos conectar seu site";
     modalIntro.textContent = "Informe o domínio que você administra. Para proteger os dados, vamos confirmar que o site é seu antes de ativar o monitoramento.";
     modalProgress.setAttribute("aria-label", "Passo 1 de 3");
@@ -612,20 +616,47 @@
     modalProgress.children[1].classList.remove("progress-active");
     modalStepLabel.innerHTML = "PASSO 1 DE 3 <span>·</span> ADICIONAR SITE";
   };
-  const showVerificationStep = (domain) => {
-    pendingDomain = domain;
-    const token = `vigia-demo=${Array.from(crypto.getRandomValues(new Uint8Array(12)), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
-    document.getElementById("dns-value").textContent = token;
-    document.getElementById("meta-value").textContent = `<meta name="vigia-verification" content="${token}">`;
+  const showVerificationStep = (site, challenge) => {
+    pendingDomain = site.domain;
+    pendingSiteId = site.id;
+    document.getElementById("dns-name").textContent = challenge.record_name;
+    document.getElementById("dns-value").textContent = challenge.record_value;
+    document.getElementById("verification-message").textContent = "";
     domainStep.hidden = true;
+    trackingStep.hidden = true;
     verificationStep.hidden = false;
     modalTitle.textContent = "Confirme que o site é seu";
-    modalIntro.textContent = `Prepare um desafio de verificação para ${domain}.`;
+    modalIntro.textContent = `Adicione o registro TXT ao DNS de ${site.domain}.`;
     modalProgress.setAttribute("aria-label", "Passo 2 de 3");
+    modalProgress.children[0].classList.remove("progress-active");
     modalProgress.children[1].classList.add("progress-active");
+    modalProgress.children[2].classList.remove("progress-active");
     modalStepLabel.innerHTML = "PASSO 2 DE 3 <span>·</span> VERIFICAR DOMÍNIO";
-    document.getElementById("dns-tab").click();
-    document.getElementById("dns-tab").focus();
+  };
+  const showTrackingStep = (site) => {
+    domainStep.hidden = true;
+    verificationStep.hidden = true;
+    trackingStep.hidden = false;
+    modalTitle.textContent = "Instale o snippet de monitoramento";
+    modalIntro.textContent = `Adicione o código abaixo ao HTML de ${site.domain}, antes da tag </body>.`;
+    modalProgress.setAttribute("aria-label", "Passo 3 de 3");
+    modalProgress.children[0].classList.remove("progress-active");
+    modalProgress.children[1].classList.remove("progress-active");
+    modalProgress.children[2].classList.add("progress-active");
+    modalStepLabel.innerHTML = "PASSO 3 DE 3 <span>·</span> INSTALAR SNIPPET";
+    const snippet = `<script async src="${window.location.origin}/vigia.js" data-site-id="${site.id}"></script>`;
+    document.getElementById("tracking-snippet").textContent = snippet;
+    document.getElementById("site-modal").hidden = false;
+  };
+  const issueVerificationChallenge = async (site) => {
+    const session = await getSession();
+    if (!session) throw new Error("Entre novamente para verificar este domínio.");
+    const challenge = await supabaseRequest("/functions/v1/vigia-verification", {
+      method: "POST",
+      accessToken: session.access_token,
+      body: { action: "issue", site_id: site.id },
+    });
+    showVerificationStep(site, challenge);
   };
 
   restoreTheme();
@@ -668,7 +699,7 @@
     setSoundEnabled(soundEnabled);
     persist("vigia-alert-sound", soundEnabled ? "on" : "off");
     showToast(soundEnabled ? "Alerta sonoro ativado" : "Alerta sonoro desativado",
-      soundEnabled ? "Prévia reproduzida. Avisos de novos acessos dependem de uma integração real." : "Nenhum som será reproduzido.");
+      soundEnabled ? "Prévia reproduzida. Os avisos de acesso exigem site verificado e snippet instalado." : "Nenhum som será reproduzido.");
   });
 
   document.getElementById("date-range").addEventListener("change", async (event) => {
@@ -680,7 +711,11 @@
     updateRange(event.target.value);
   });
   document.getElementById("add-site-button").addEventListener("click", openModal);
-  document.getElementById("notice-add-site").addEventListener("click", openModal);
+  document.getElementById("notice-add-site").addEventListener("click", () => {
+    const activeSite = userSites.find((site) => site.id === activeSiteId);
+    if (activeSite?.verified_at) showTrackingStep(activeSite);
+    else openModal();
+  });
   document.getElementById("site-switcher").addEventListener("click", () => {
     if (authSession && userSites.length) {
       siteMenu.hidden = !siteMenu.hidden;
@@ -732,30 +767,52 @@
     showDomainStep();
     domainInput.focus();
   });
-  const selectVerificationMethod = (method) => {
-    const useDns = method === "dns";
-    document.getElementById("dns-tab").classList.toggle("active", useDns);
-    document.getElementById("dns-tab").setAttribute("aria-selected", String(useDns));
-    document.getElementById("meta-tab").classList.toggle("active", !useDns);
-    document.getElementById("meta-tab").setAttribute("aria-selected", String(!useDns));
-    document.getElementById("dns-panel").hidden = !useDns;
-    document.getElementById("meta-panel").hidden = useDns;
-  };
-  document.getElementById("dns-tab").addEventListener("click", () => selectVerificationMethod("dns"));
-  document.getElementById("meta-tab").addEventListener("click", () => selectVerificationMethod("meta"));
+  document.getElementById("tracking-done").addEventListener("click", closeModal);
   document.querySelectorAll("[data-copy]").forEach((button) => {
     button.addEventListener("click", async () => {
       const value = document.getElementById(button.dataset.copy).textContent;
       try {
         await navigator.clipboard.writeText(value);
-        showToast("Copiado", "O valor de demonstração foi copiado.");
+        showToast("Copiado", "O conteúdo foi copiado.");
       } catch {
         showToast("Não foi possível copiar", "Selecione e copie o valor manualmente.", true);
       }
     });
   });
-  document.getElementById("check-domain").addEventListener("click", () => {
-    showToast("Verificação não disponível", `O desafio de ${pendingDomain} é apenas uma prévia. É necessário um servidor para confirmar a propriedade.`, true);
+  document.getElementById("check-domain").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    const session = await getSession();
+    if (!session || !pendingSiteId) {
+      showToast("Sessão expirada", "Entre novamente para verificar o domínio.", true);
+      return;
+    }
+    const message = document.getElementById("verification-message");
+    button.disabled = true;
+    button.textContent = "Consultando DNS…";
+    message.textContent = "";
+    try {
+      const result = await supabaseRequest("/functions/v1/vigia-verification", {
+        method: "POST",
+        accessToken: session.access_token,
+        body: { action: "verify", site_id: pendingSiteId },
+      });
+      if (!result.verified) {
+        message.textContent = result.message || "O registro TXT ainda não foi encontrado.";
+        return;
+      }
+      const site = userSites.find((item) => item.id === pendingSiteId);
+      if (!site) throw new Error("Site não encontrado na conta atual.");
+      site.verified_at = result.verified_at;
+      updateSitePicker();
+      await loadSiteAnalytics(site);
+      showTrackingStep(site);
+      showToast("Domínio verificado", "O site foi autorizado. Instale o snippet para iniciar a coleta.");
+    } catch (error) {
+      message.textContent = error.message;
+    } finally {
+      button.disabled = false;
+      button.textContent = "Verificar domínio";
+    }
   });
 
   const registerSite = async (domain) => {
@@ -768,22 +825,33 @@
     }
     try {
       const user = await supabaseRequest("/auth/v1/user", { accessToken: session.access_token });
-      const created = await supabaseRequest("/rest/v1/sites", {
-        method: "POST",
-        accessToken: session.access_token,
-        headers: { Prefer: "return=representation" },
-        body: { owner_id: user.id, domain },
-      });
-      userSites = [...created, ...userSites];
-      activeSiteId = created[0]?.id || activeSiteId;
+      let site;
+      try {
+        const created = await supabaseRequest("/rest/v1/sites", {
+          method: "POST",
+          accessToken: session.access_token,
+          headers: { Prefer: "return=representation" },
+          body: { owner_id: user.id, domain },
+        });
+        site = created[0];
+        userSites = [site, ...userSites];
+      } catch (error) {
+        if (error.code !== "23505") throw error;
+        await loadSites();
+        site = userSites.find((item) => item.domain === domain);
+        if (!site) throw error;
+      }
+      activeSiteId = site.id;
       updateSitePicker();
-      await loadSiteAnalytics(created[0]);
-      document.getElementById("site-modal").hidden = true;
-      domainInput.value = "";
-      pendingDomain = "";
-      showToast("Site registrado", `${domain} foi salvo na sua conta como não verificado. A coleta ainda precisa do endpoint seguro e do processo de verificação.`, true);
+      if (site.verified_at) {
+        await loadSiteAnalytics(site);
+        showTrackingStep(site);
+        return;
+      }
+      await issueVerificationChallenge(site);
+      showToast("Registro DNS gerado", `Adicione o TXT indicado para ${domain} e depois confirme a verificação.`);
     } catch (error) {
-      showToast("Não foi possível registrar o site", error.message, true);
+      showToast("Não foi possível preparar a verificação", error.message, true);
     }
   };
 

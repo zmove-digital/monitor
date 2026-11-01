@@ -44,7 +44,7 @@
           <div class="privacy-card">
             <span class="privacy-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 16 5v4.6c0 3.6-2.4 6.3-6 7.9-3.6-1.6-6-4.3-6-7.9V5l6-2.5Z"/><path d="m7.5 10 1.7 1.7 3.5-3.5"/></svg></span>
             <strong>Privacidade em primeiro lugar</strong>
-            <p>Sem fingerprinting. Localização aproximada; sem guardar IP.</p>
+            <p>Sem fingerprinting. Sem coleta de IP; localização indisponível nesta versão.</p>
             <a href="#privacy">Saiba como funciona <span aria-hidden="true">→</span></a>
           </div>
           <button class="profile-button" type="button" aria-label="Perfil de demonstração">
@@ -122,7 +122,7 @@
             <article class="panel visitors-panel" id="visitors">
               <div class="panel-header"><div><div class="title-with-live"><h2>Visitantes agora</h2><span class="tiny-live"><i></i>AO VIVO</span></div><p>Atividade recente no seu site</p></div><button class="text-button refresh-button" id="refresh-visitors" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16.3 8A6.5 6.5 0 0 0 5 5.5L3.5 7M3.7 12A6.5 6.5 0 0 0 15 14.5l1.5-1.5M3.5 3.5V7h3.5M16.5 16.5V13H13"/></svg>Atualizar</button></div>
               <div class="visitor-table-wrap"><table class="visitor-table"><thead><tr><th>LOCALIZAÇÃO APROXIMADA</th><th>PÁGINA ATUAL</th><th>HÁ QUANTO TEMPO</th><th>PROVEDOR</th></tr></thead><tbody id="visitor-rows"></tbody></table></div>
-              <div class="table-footnote"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 7.5v3M8 5.2v.1"/></svg>Localização estimada pelo IP. Pode não ser exata; o endereço IP não é armazenado.</div>
+              <div class="table-footnote"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 7.5v3M8 5.2v.1"/></svg>Localização e provedor indisponíveis nesta versão. O Vigia não coleta nem armazena IP.</div>
             </article>
             <article class="panel pages-panel" id="pages">
               <div class="panel-header"><div><h2>Páginas populares</h2><p>Mais visitadas neste período</p></div><button class="more-button" type="button" aria-label="Mais opções de páginas">•••</button></div>
@@ -135,7 +135,7 @@
               <button class="text-button pages-link" id="show-pages" type="button">Ver todas as páginas <span aria-hidden="true">→</span></button>
             </article>
           </section>
-          <footer class="footer-note" id="privacy"><span>Vigia <span class="footer-dot">·</span> Monitoramento simples, privacidade respeitada.</span><span>Localização aproximada. Sem IP armazenado ou fingerprinting.</span></footer>
+          <footer class="footer-note" id="privacy"><span>Vigia <span class="footer-dot">·</span> Monitoramento simples, privacidade respeitada.</span><span>Sem localização nesta versão. Sem coleta de IP ou fingerprinting.</span></footer>
         </div>
       </main>
     </div>
@@ -157,23 +157,24 @@
           </div>
         </form>
         <section id="verification-step" hidden aria-labelledby="verification-heading">
-          <div class="challenge-notice"><strong>Prévia de verificação</strong><span>Este código é apenas demonstrativo. Não foi publicado por um servidor e não confirma a propriedade do domínio.</span></div>
+          <div class="challenge-notice"><strong>Verificação DNS TXT</strong><span>O Vigia confirma a propriedade consultando o registro DNS público. O token expira em 24 horas.</span></div>
           <h3 id="verification-heading">Adicione um registro ao seu site</h3>
-          <p class="verification-description">Escolha um método. Em produção, o desafio será confirmado por uma integração segura.</p>
-          <div class="verification-tabs" role="tablist" aria-label="Método de verificação">
-            <button class="verification-tab active" id="dns-tab" type="button" role="tab" aria-selected="true" aria-controls="dns-panel">Registro DNS TXT</button>
-            <button class="verification-tab" id="meta-tab" type="button" role="tab" aria-selected="false" aria-controls="meta-panel">Meta tag</button>
-          </div>
-          <div class="verification-panel" id="dns-panel" role="tabpanel" aria-labelledby="dns-tab">
+          <p class="verification-description">No painel DNS do seu domínio, crie um registro TXT com estes valores. A propagação pode levar alguns minutos.</p>
+          <div class="verification-panel">
             <div class="record-row"><span>TIPO</span><strong>TXT</strong></div>
             <div class="record-row"><span>NOME / HOST</span><div class="copy-field"><code id="dns-name">_vigia</code><button class="copy-button" type="button" data-copy="dns-name">Copiar</button></div></div>
             <div class="record-row"><span>VALOR</span><div class="copy-field"><code id="dns-value"></code><button class="copy-button" type="button" data-copy="dns-value">Copiar</button></div></div>
           </div>
-          <div class="verification-panel" id="meta-panel" role="tabpanel" aria-labelledby="meta-tab" hidden>
-            <p class="meta-instructions">Adicione esta tag dentro de <code>&lt;head&gt;</code> na página inicial:</p>
-            <div class="copy-field code-field"><code id="meta-value"></code><button class="copy-button" type="button" data-copy="meta-value">Copiar</button></div>
-          </div>
+          <small class="field-error" id="verification-message" role="status" aria-live="polite"></small>
           <div class="modal-actions"><button class="button button-secondary" id="back-to-domain" type="button">Voltar</button><button class="button button-primary modal-submit" id="check-domain" type="button">Verificar domínio</button></div>
+        </section>
+        <section id="tracking-step" hidden aria-labelledby="tracking-heading">
+          <div class="challenge-notice"><strong>Pronto para coletar acessos</strong><span>O snippet registra páginas visitadas e presença temporária. Não coleta nem envia endereços IP.</span></div>
+          <h3 id="tracking-heading">Instale o snippet no site</h3>
+          <p class="verification-description">Cole este código antes de <code>&lt;/body&gt;</code> em todas as páginas que deseja medir.</p>
+          <div class="copy-field code-field"><code id="tracking-snippet"></code><button class="copy-button" type="button" data-copy="tracking-snippet">Copiar</button></div>
+          <p class="verification-description">O painel começará a mostrar os acessos após a instalação. A localização e o provedor ficam indisponíveis nesta primeira versão.</p>
+          <div class="modal-actions"><button class="button button-primary modal-submit" id="tracking-done" type="button">Concluir</button></div>
         </section>
         <div class="modal-privacy"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2 13 4v3.8c0 3-2 5.2-5 6.6-3-1.4-5-3.6-5-6.6V4l5-2Z"/></svg>Seus dados são tratados com privacidade desde o início.</div>
       </section>
