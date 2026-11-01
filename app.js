@@ -414,9 +414,15 @@
     renderTrend(events, document.getElementById("date-range").value);
     const notice = document.querySelector(".demo-notice");
     notice.hidden = false;
-    notice.querySelector("p").textContent = site.verified_at
-      ? "Domínio verificado. Instale o snippet para iniciar a coleta de acessos reais."
-      : "Site registrado, mas ainda não verificado. A ingestão só poderá ser ativada após confirmar o domínio.";
+    const noticeMessage = notice.querySelector("p");
+    if (!site.verified_at) {
+      noticeMessage.textContent = "Site registrado, mas ainda não verificado. A ingestão só poderá ser ativada após confirmar o domínio.";
+    } else if (pageViews.length > 0) {
+      const days = document.getElementById("date-range").value;
+      noticeMessage.textContent = `Coleta ativa: ${formatNumber(pageViews.length)} visualização(ões) registrada(s) nos últimos ${days} dias.`;
+    } else {
+      noticeMessage.textContent = "Domínio verificado. Ainda não recebemos visitas neste período. Confirme se o snippet está publicado e abra uma página do site para testar.";
+    }
     notice.querySelector(".notice-link").hidden = !site.verified_at;
     notice.querySelector(".notice-link").textContent = "Ver snippet";
   };
