@@ -44,6 +44,7 @@ npx supabase functions deploy vigia-ingest --no-verify-jwt --project-ref cmclojr
 ```
 
 The CLI opens an authorization flow in the browser; sign in to the Supabase account that owns the project. These commands do not need the database password.
+On Windows PowerShell, if script execution blocks `npx`, use `npx.cmd` instead. Run the deploy commands from the repository root, the directory containing `supabase\functions\vigia-verification\index.ts`.
 
 O runtime do Supabase fornece `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` às funções. A chave administrativa é usada somente no servidor e nunca deve ser copiada para o app, para o site monitorado, para o GitHub ou para uma conversa. Não é necessário compartilhar a senha do banco.
 
