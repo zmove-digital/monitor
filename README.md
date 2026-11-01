@@ -12,6 +12,26 @@ O Vigia pode ser instalado como PWA pelo Chrome em um endereço HTTPS. Abra o en
 
 O service worker mantém apenas o shell estático do app em cache. Chamadas ao Supabase e dados de conta/analytics não são armazenados pelo cache offline.
 
+## APK Android de teste
+
+O projeto também pode ser empacotado com Capacitor. O APK de depuração contém a interface web do Vigia e usa o Supabase configurado em `supabase-config.js`; é necessário ter conexão com a internet para autenticar e carregar métricas. O endereço `trackerUrl` nessa configuração determina a URL do `vigia.js` mostrada no passo de instalação do snippet.
+
+Requisitos de build: Node.js 22 ou superior, JDK 21 e Android SDK instalado com a plataforma Android 36. Na raiz do projeto, instale as dependências e gere o APK:
+
+```sh
+npm install
+npm run android:debug
+```
+
+No PowerShell do Windows, use `npm.cmd` no lugar de `npm` se a política de execução bloquear scripts `.ps1`:
+
+```powershell
+npm.cmd install
+npm.cmd run android:debug
+```
+
+O arquivo de teste é `android/app/build/outputs/apk/debug/app-debug.apk`. Para compilar localmente, abra a pasta `android` no Android Studio ou use `npm run android:sync` antes de sincronizar mudanças do app web. O ID inicial do app é `com.zmovedigital.vigia`; defina o ID final antes da primeira publicação na Play Store, pois ele identifica permanentemente o app na loja. A mudança posterior do endereço do app ou do rastreador exige atualizar a configuração, sincronizar e gerar um novo APK. A versão de teste não está assinada para distribuição na Play Store.
+
 ## Publicar no Cloudflare Pages
 
 Crie um projeto no Cloudflare Pages conectado ao repositório GitHub `zmove-digital/monitor`. Configure o diretório raiz como `/`, sem framework, com o comando de build abaixo e `dist` como diretório de saída:

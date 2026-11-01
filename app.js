@@ -644,7 +644,8 @@
     modalProgress.children[1].classList.remove("progress-active");
     modalProgress.children[2].classList.add("progress-active");
     modalStepLabel.innerHTML = "PASSO 3 DE 3 <span>·</span> INSTALAR SNIPPET";
-    const snippet = `<script async src="${window.location.origin}/vigia.js" data-site-id="${site.id}"></script>`;
+    const trackerOrigin = supabase?.trackerUrl || window.location.origin;
+    const snippet = `<script async src="${trackerOrigin}/vigia.js" data-site-id="${site.id}"></script>`;
     document.getElementById("tracking-snippet").textContent = snippet;
     document.getElementById("site-modal").hidden = false;
   };
