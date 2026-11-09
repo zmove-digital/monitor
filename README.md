@@ -76,6 +76,20 @@ O endpoint de ingestão é público por natureza; ele exige site verificado e co
 
 A preferência de alerta sonoro fica no navegador e a ativação toca uma prévia curta. Quando há presença real, o painel consulta o Supabase a cada 15 segundos e pode avisar sobre novos visitantes; não há conexão realtime persistente nesta versão.
 
+## Origem do tráfego
+
+O painel **De onde vêm** agrupa os visitantes em canais a partir do primeiro referenciador da sessão:
+
+- **Google (busca)**: referenciador de qualquer domínio `google.*` (inclusive `www.google.com.br`), o app Google no Android (`com.google.android.googlequicksearchbox`) ou `utm_source=google` sem sinal de anúncio.
+- **Google Ads**: presença de `gclid`, `gbraid`, `wbraid`, `dclid` ou `gad_source` na URL, ou `utm_source=google` com `utm_medium` de mídia paga.
+- **Acesso direto**: nenhum referenciador e nenhum sinal de campanha do Google.
+- **Redes sociais** e **Outras buscas**: domínios conhecidos dessas categorias.
+- **Outros sites**: demais referenciadores.
+
+O snippet guarda a origem da primeira página vista em `sessionStorage` e reaproveita essa origem nas navegações seguintes, então quem chega pelo Google e continua navegando no site não passa a contar como acesso direto. A contagem por canal usa visitantes únicos (sessões), e não page views.
+
+**Limite importante:** só é possível identificar o Google quando o navegador envia o referenciador ou parâmetros de campanha. Visitas com referenciador removido (apps, modo privado, política `no-referrer`, HTTP→HTTPS) permanecem como **Acesso direto** e não há como saber se vieram de busca. O botão **Ver todas as origens** mostra os domínios brutos que mais contribuíram para os canais.
+
 ## Requisitos de privacidade
 
 - Coletar somente os dados necessários para métricas de páginas e localização/provedor aproximados.

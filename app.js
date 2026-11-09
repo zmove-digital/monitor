@@ -40,6 +40,7 @@
   let lastPresenceSiteId = null;
   let knownVisitorIds = new Set();
   let soundEnabled = false;
+  let sourceBreakdown = [];
 
   const showToast = (title, message, warning = false) => {
     const toast = document.createElement("div");
@@ -254,8 +255,77 @@
     document.querySelector(".chart-wrap").setAttribute("aria-label", `Gráfico de dados reais com visitantes e visualizações nos últimos ${days} dias`);
   };
 
+  const numberFormatter = new Intl.NumberFormat("pt-BR");
+  const formatNumber = (number) => numberFormatter.format(number);
+
+  const TRAFFIC_CHANNELS = [
+    { name: "Google (busca)", color: "bar-purple", always: true },
+    { name: "Google Ads", color: "bar-orange", always: false },
+    { name: "Acesso direto", color: "bar-blue", always: true },
+    { name: "Redes sociais", color: "bar-pink", always: false },
+    { name: "Outras buscas", color: "bar-green", always: false },
+    { name: "Outros sites", color: "bar-slate", always: false },
+  ];
+  const GOOGLE_SEARCH_HOST = /^(?:[a-z0-9-]+\.)*google\.[a-z]{2,4}(?:\.[a-z]{2})?$/;
+  const GOOGLE_APP_HOSTS = ["com.google.android.googlequicksearchbox"];
+  const SOCIAL_DOMAINS = [
+    "facebook.com", "fb.com", "instagram.com", "t.co", "twitter.com", "x.com",
+    "linkedin.com", "lnkd.in", "youtube.com", "youtu.be", "tiktok.com", "pinterest.com",
+    "reddit.com", "whatsapp.com", "wa.me", "telegram.org", "t.me", "threads.net",
+    "snapchat.com", "discord.com", "twitch.tv", "tumblr.com", "vk.com", "kwai.com",
+  ];
+  const OTHER_SEARCH_DOMAINS = [
+    "bing.com", "duckduckgo.com", "search.brave.com", "ecosia.org", "qwant.com",
+    "startpage.com", "search.yahoo.com", "yahoo.com", "msn.com", "yandex.com",
+    "yandex.ru", "baidu.com", "naver.com", "seznam.cz",
+  ];
+
+  const hostMatches = (host, domains) => domains.some((domain) => host === domain || host.endsWith(`.${domain}`));
+
+  // "Acesso direto" means the browser sent neither a referrer nor a Google campaign
+  // signal. A visit that truly came from Google but had its referrer stripped (apps,
+  // private mode, no-referrer policy) cannot be told apart and stays as direct traffic.
+  const classifyTrafficSource = (domain) => {
+    if (!domain) return "Acesso direto";
+    const host = String(domain).trim().toLowerCase();
+    if (host === "ads.google.com") return "Google Ads";
+    if (host === "google.com" || GOOGLE_SEARCH_HOST.test(host) || hostMatches(host, GOOGLE_APP_HOSTS)) return "Google (busca)";
+    if (hostMatches(host, SOCIAL_DOMAINS)) return "Redes sociais";
+    if (hostMatches(host, OTHER_SEARCH_DOMAINS)) return "Outras buscas";
+    return "Outros sites";
+  };
+
+  const renderSourceRows = (entries, total) => {
+    const sourceRows = document.querySelector(".source-bars");
+    sourceRows.replaceChildren();
+    entries.forEach(([name, count, color]) => {
+      const percentage = total ? Math.round((count / total) * 100) : 0;
+      const row = document.createElement("div");
+      row.className = "source-row";
+      const meta = document.createElement("div");
+      meta.className = "source-meta";
+      const label = document.createElement("span");
+      label.textContent = name;
+      const summary = document.createElement("strong");
+      const value = document.createElement("span");
+      value.className = "source-count";
+      value.textContent = formatNumber(count);
+      const ratio = document.createElement("small");
+      ratio.textContent = `${percentage}%`;
+      summary.append(value, document.createTextNode(" "), ratio);
+      meta.append(label, summary);
+      const track = document.createElement("div");
+      track.className = "progress-track";
+      const bar = document.createElement("i");
+      bar.className = color;
+      bar.style.width = `${percentage}%`;
+      track.append(bar);
+      row.append(meta, track);
+      sourceRows.append(row);
+    });
+  };
+
   const renderSiteAnalytics = (site, events, visitors, notifyNewVisitors) => {
-    const formatNumber = (number) => new Intl.NumberFormat("pt-BR").format(number);
     const pageViews = events.filter((event) => event.event_type === "page_view");
     const sessionCounts = new Map();
     pageViews.forEach((event) => sessionCounts.set(event.visitor_session_id, (sessionCounts.get(event.visitor_session_id) || 0) + 1));
@@ -275,45 +345,31 @@
       : `${Math.floor(averageDuration / 60)}m ${String(averageDuration % 60).padStart(2, "0")}s`;
     document.getElementById("metric-bounce").innerHTML = `${bounceRate == null ? "—" : bounceRate.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}<span class="value-unit">${bounceRate == null ? "" : "%"}</span>`;
 
-    const referrals = new Map();
-    pageViews.forEach((event) => {
-      const source = event.referrer_domain || "Acesso direto";
-      referrals.set(source, (referrals.get(source) || 0) + 1);
+    // Attribute each visitor to the source of the first page view in the session, so a
+    // visit that started on Google is not counted as direct when the visitor navigates.
+    const sessionSources = new Map();
+    [...pageViews].reverse().forEach((event) => {
+      if (!sessionSources.has(event.visitor_session_id)) {
+        sessionSources.set(event.visitor_session_id, event.referrer_domain || null);
+      }
     });
-    document.getElementById("source-total").textContent = formatNumber(pageViews.length);
-    const sourceRows = document.querySelector(".source-bars");
-    sourceRows.replaceChildren();
-    const sourceFallback = ["Busca orgânica", "Direto", "Redes sociais", "Referências"];
-    const sourceIds = ["source-organic", "source-direct", "source-social", "source-referrals"];
-    const sourceColors = ["bar-purple", "bar-blue", "bar-pink", "bar-green"];
-    const sources = [...referrals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
-    for (let index = 0; index < 4; index += 1) {
-      const [sourceName, count] = sources[index] || [sourceFallback[index], 0];
-      const percentage = pageViews.length ? Math.round(count / pageViews.length * 100) : 0;
-      const row = document.createElement("div");
-      row.className = "source-row";
-      const meta = document.createElement("div");
-      meta.className = "source-meta";
-      const name = document.createElement("span");
-      name.textContent = sourceName;
-      const summary = document.createElement("strong");
-      const total = document.createElement("span");
-      total.id = sourceIds[index];
-      total.className = "source-count";
-      total.textContent = formatNumber(count);
-      const ratio = document.createElement("small");
-      ratio.textContent = `${percentage}%`;
-      summary.append(total, document.createTextNode(" "), ratio);
-      meta.append(name, summary);
-      const track = document.createElement("div");
-      track.className = "progress-track";
-      const bar = document.createElement("i");
-      bar.className = sourceColors[index];
-      bar.style.width = `${percentage}%`;
-      track.append(bar);
-      row.append(meta, track);
-      sourceRows.append(row);
-    }
+    const channelCounts = new Map();
+    const domainCounts = new Map();
+    sessionSources.forEach((domain) => {
+      const channel = classifyTrafficSource(domain);
+      channelCounts.set(channel, (channelCounts.get(channel) || 0) + 1);
+      const label = domain || "Acesso direto";
+      domainCounts.set(label, (domainCounts.get(label) || 0) + 1);
+    });
+    const visitorTotal = sessionSources.size;
+    document.getElementById("source-total").textContent = formatNumber(visitorTotal);
+    renderSourceRows(
+      TRAFFIC_CHANNELS
+        .filter((channel) => channel.always || (channelCounts.get(channel.name) || 0) > 0)
+        .map((channel) => [channel.name, channelCounts.get(channel.name) || 0, channel.color]),
+      visitorTotal,
+    );
+    sourceBreakdown = [...domainCounts.entries()].sort((a, b) => b[1] - a[1]);
 
     const pageGroups = new Map();
     pageViews.forEach((event) => {
@@ -498,22 +554,29 @@
 
   const updateRange = (days) => {
     const metrics = {
-      7: { visitors: "2.847", views: "6.391", time: "2m 34s", bounce: "38,6", sources: ["1.196", "797", "569", "285"], pages: ["1.284", "967", "742", "531"] },
-      30: { visitors: "11.629", views: "28.214", time: "2m 41s", bounce: "36,2", sources: ["4.890", "3.280", "2.332", "1.127"], pages: ["5.200", "4.100", "3.420", "2.500"] },
-      90: { visitors: "34.915", views: "83.502", time: "2m 29s", bounce: "39,1", sources: ["14.664", "9.776", "6.983", "3.492"], pages: ["15.500", "13.000", "11.200", "8.800"] },
+      7: { visitors: 2847, views: 6391, time: "2m 34s", bounce: "38,6", sources: [1196, 797, 569, 285], pages: ["1.284", "967", "742", "531"] },
+      30: { visitors: 11629, views: 28214, time: "2m 41s", bounce: "36,2", sources: [4890, 3280, 2332, 1127], pages: ["5.200", "4.100", "3.420", "2.500"] },
+      90: { visitors: 34915, views: 83502, time: "2m 29s", bounce: "39,1", sources: [14664, 9776, 6983, 3492], pages: ["15.500", "13.000", "11.200", "8.800"] },
     }[days];
     if (!metrics) return;
-    document.getElementById("metric-visitors").textContent = metrics.visitors;
-    document.getElementById("metric-views").textContent = metrics.views;
-    document.getElementById("metric-time").textContent = metrics.time;
-    document.getElementById("metric-bounce").innerHTML = `${metrics.bounce}<span class="value-unit">%</span>`;
-    document.getElementById("source-total").textContent = metrics.visitors;
-    ["source-organic", "source-direct", "source-social", "source-referrals"].forEach((id, index) => {
-      document.getElementById(id).textContent = metrics.sources[index];
-    });
-    metrics.pages.forEach((value, index) => {
-      document.getElementById(`popular-page-${index + 1}`).textContent = value;
-    });
+    const setText = (id, value) => {
+      const element = document.getElementById(id);
+      if (element) element.textContent = value;
+    };
+    setText("metric-visitors", formatNumber(metrics.visitors));
+    setText("metric-views", formatNumber(metrics.views));
+    setText("metric-time", metrics.time);
+    const bounce = document.getElementById("metric-bounce");
+    if (bounce) bounce.innerHTML = `${metrics.bounce}<span class="value-unit">%</span>`;
+    setText("source-total", formatNumber(metrics.visitors));
+    renderSourceRows([
+      ["Google (busca)", metrics.sources[0], "bar-purple"],
+      ["Acesso direto", metrics.sources[1], "bar-blue"],
+      ["Redes sociais", metrics.sources[2], "bar-pink"],
+      ["Outros sites", metrics.sources[3], "bar-green"],
+    ], metrics.visitors);
+    sourceBreakdown = [];
+    metrics.pages.forEach((value, index) => setText(`popular-page-${index + 1}`, value));
     const labels = document.getElementById("chart-labels");
     labels.replaceChildren();
     const today = new Date();
@@ -943,7 +1006,17 @@
       showToast("Dados de demonstração", "A lista não se conecta a visitantes reais neste protótipo.", true);
     }
   });
-  document.getElementById("show-sources").addEventListener("click", () => showToast("Origens de tráfego", "Os canais exibidos são exemplos e não vêm de uma fonte de analytics."));
+  document.getElementById("show-sources").addEventListener("click", () => {
+    if (!sourceBreakdown.length) {
+      showToast("Origens de tráfego", "Os canais exibidos são exemplos e não vêm de uma fonte de analytics.");
+      return;
+    }
+    const summary = sourceBreakdown
+      .slice(0, 6)
+      .map(([name, count]) => `${name}: ${formatNumber(count)}`)
+      .join(" · ");
+    showToast("Origens de tráfego", `${summary}. O Google só é separado quando o navegador envia o referrer do Google ou parâmetros de campanha (gclid, utm_source); sem esses sinais, a visita fica em Acesso direto.`);
+  });
   document.getElementById("show-pages").addEventListener("click", () => showToast("Páginas populares", "As páginas e tempos exibidos são dados de demonstração."));
 
   window.setInterval(() => {
