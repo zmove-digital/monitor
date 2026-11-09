@@ -41,6 +41,7 @@
   let knownVisitorIds = new Set();
   let soundEnabled = false;
   let sourceBreakdown = [];
+  let recoverySession = null;
 
   const showToast = (title, message, warning = false) => {
     const toast = document.createElement("div");
@@ -538,18 +539,65 @@
 
   const showAuthModal = (mode = "login") => {
     authMode = mode;
+    const recovery = mode === "recovery";
     authMessage.hidden = true;
     authMessage.textContent = "";
-    document.getElementById("auth-title").textContent = mode === "signup" ? "Crie seu espaço" : "Entre no seu espaço";
-    document.getElementById("auth-intro").textContent = mode === "signup"
-      ? "Crie uma conta para registrar seus sites. Usamos autenticação segura do Supabase."
-      : "Acesse seus sites e métricas privadas. A autenticação é gerenciada pelo Supabase.";
-    document.getElementById("auth-submit").textContent = mode === "signup" ? "Criar conta" : "Entrar";
-    document.getElementById("auth-switch-text").textContent = mode === "signup" ? "Já tem uma conta?" : "Ainda não tem uma conta?";
-    document.getElementById("auth-switch").textContent = mode === "signup" ? "Entrar" : "Criar conta";
-    authPassword.autocomplete = mode === "signup" ? "new-password" : "current-password";
+    authMessage.classList.add("field-error");
+    authMessage.classList.remove("field-success");
     authModal.hidden = false;
-    window.setTimeout(() => authEmail.focus(), 0);
+    document.getElementById("auth-title").textContent = recovery
+      ? "Defina uma nova senha"
+      : mode === "signup" ? "Crie seu espaço" : "Entre no seu espaço";
+    document.getElementById("auth-intro").textContent = recovery
+      ? "Você abriu um link de recuperação. Escolha a nova senha da sua conta."
+      : mode === "signup"
+        ? "Crie uma conta para registrar seus sites. Usamos autenticação segura do Supabase."
+        : "Acesse seus sites e métricas privadas. A autenticação é gerenciada pelo Supabase.";
+    document.getElementById("auth-submit").textContent = recovery ? "Salvar nova senha" : mode === "signup" ? "Criar conta" : "Entrar";
+    document.getElementById("auth-email-label").hidden = recovery;
+    document.getElementById("auth-email-field").hidden = recovery;
+    document.getElementById("auth-forgot").hidden = recovery || mode === "signup";
+    authPassword.value = "";
+    authPassword.autocomplete = mode === "login" ? "current-password" : "new-password";
+    authPassword.placeholder = recovery ? "Nova senha (mín. 8 caracteres)" : "Mínimo de 8 caracteres";
+    document.getElementById("auth-switch-text").textContent = recovery
+      ? "Lembrou a senha?"
+      : mode === "signup" ? "Já tem uma conta?" : "Ainda não tem uma conta?";
+    document.getElementById("auth-switch").textContent = recovery
+      ? "Voltar para o login"
+      : mode === "signup" ? "Entrar" : "Criar conta";
+    window.setTimeout(() => (recovery ? authPassword : authEmail).focus(), 0);
+  };
+
+  const getRecoveryRedirect = () => {
+    const { protocol, hostname, origin, pathname } = window.location;
+    if (protocol !== "https:" || hostname === "localhost" || hostname === "127.0.0.1") return "";
+    return `${origin}${pathname}`;
+  };
+
+  // Supabase sends the recovery link with the session tokens in the URL hash.
+  const handleRecoveryLink = () => {
+    const rawHash = window.location.hash.replace(/^#/, "");
+    if (!rawHash) return false;
+    const params = new URLSearchParams(rawHash);
+    const error = params.get("error_description") || params.get("error");
+    if (!error && params.get("type") !== "recovery") return false;
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    if (error) {
+      showAuthModal("login");
+      authMessage.textContent = "O link de recuperação expirou ou já foi usado. Use “Esqueci minha senha” para receber outro.";
+      authMessage.hidden = false;
+      return true;
+    }
+    if (!params.get("access_token")) return false;
+    recoverySession = {
+      access_token: params.get("access_token"),
+      refresh_token: params.get("refresh_token"),
+      expires_in: Number(params.get("expires_in")) || 3600,
+      token_type: params.get("token_type") || "bearer",
+    };
+    showAuthModal("recovery");
+    return true;
   };
 
   const updateRange = (days) => {
@@ -738,9 +786,13 @@
   } catch {
     authSession = null;
   }
-  loadSites().catch((error) => {
-    showToast("Não foi possível carregar sua conta", error.message, true);
-  });
+  const recoveryMode = handleRecoveryLink();
+  if (recoveryMode) authSession = null;
+  if (!recoveryMode) {
+    loadSites().catch((error) => {
+      showToast("Não foi possível carregar sua conta", error.message, true);
+    });
+  }
 
   themeToggle.addEventListener("click", () => {
     const dark = !body.classList.contains("dark");
@@ -958,11 +1010,85 @@
   document.getElementById("auth-close").addEventListener("click", () => { authModal.hidden = true; });
   authModal.addEventListener("click", (event) => { if (event.target === authModal) authModal.hidden = true; });
   document.getElementById("auth-switch").addEventListener("click", () => showAuthModal(authMode === "login" ? "signup" : "login"));
+  document.getElementById("auth-forgot").addEventListener("click", async () => {
+    const email = authEmail.value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      authMessage.classList.add("field-error");
+      authMessage.classList.remove("field-success");
+      authMessage.textContent = "Digite seu e-mail acima para receber o link de recuperação.";
+      authMessage.hidden = false;
+      authEmail.focus();
+      return;
+    }
+    const button = document.getElementById("auth-forgot");
+    const originalLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = "Enviando…";
+    authMessage.hidden = true;
+    try {
+      const redirect = getRecoveryRedirect();
+      const query = redirect ? `?redirect_to=${encodeURIComponent(redirect)}` : "";
+      await supabaseRequest(`/auth/v1/recover${query}`, { method: "POST", body: { email } });
+      authMessage.classList.remove("field-error");
+      authMessage.classList.add("field-success");
+      authMessage.textContent = "Se existir uma conta com esse e-mail, enviamos um link para definir uma nova senha. Confira também a caixa de spam.";
+      authMessage.hidden = false;
+    } catch (error) {
+      authMessage.classList.add("field-error");
+      authMessage.classList.remove("field-success");
+      authMessage.textContent = /rate limit|too many/i.test(error.message)
+        ? "Muitos pedidos em pouco tempo. Aguarde alguns minutos antes de tentar novamente."
+        : error.message;
+      authMessage.hidden = false;
+    } finally {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
+  });
   authForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     authMessage.hidden = true;
+    authMessage.classList.add("field-error");
+    authMessage.classList.remove("field-success");
     const email = authEmail.value.trim();
     const password = authPassword.value;
+    if (authMode === "recovery") {
+      if (!recoverySession?.access_token) {
+        authMessage.textContent = "O link de recuperação expirou. Use “Esqueci minha senha” para receber outro.";
+        authMessage.hidden = false;
+        return;
+      }
+      if (password.length < 8) {
+        authMessage.textContent = "A nova senha precisa ter pelo menos 8 caracteres.";
+        authMessage.hidden = false;
+        return;
+      }
+      const submit = document.getElementById("auth-submit");
+      submit.disabled = true;
+      submit.textContent = "Salvando…";
+      try {
+        await supabaseRequest("/auth/v1/user", {
+          method: "PUT",
+          accessToken: recoverySession.access_token,
+          body: { password },
+        });
+        saveSession({ ...recoverySession, expires_at: Date.now() / 1000 + (recoverySession.expires_in || 3600) });
+        recoverySession = null;
+        authModal.hidden = true;
+        authPassword.value = "";
+        await loadSites();
+        showToast("Senha atualizada", "Sua nova senha foi salva e você já está conectado.");
+      } catch (error) {
+        authMessage.textContent = /jwt|token|expired/i.test(error.message)
+          ? "O link de recuperação expirou ou já foi usado. Use “Esqueci minha senha” para receber outro."
+          : error.message;
+        authMessage.hidden = false;
+      } finally {
+        submit.disabled = false;
+        submit.textContent = "Salvar nova senha";
+      }
+      return;
+    }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 8) {
       authMessage.textContent = "Informe um e-mail válido e uma senha com pelo menos 8 caracteres.";
       authMessage.hidden = false;

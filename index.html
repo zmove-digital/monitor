@@ -186,10 +186,11 @@
         <h2 id="auth-title">Entre no seu espaço</h2>
         <p class="modal-intro" id="auth-intro">Acesse seus sites e métricas privadas. A autenticação é gerenciada pelo Supabase.</p>
         <form id="auth-form" novalidate>
-          <label for="auth-email">E-mail</label>
-          <div class="input-wrap"><input id="auth-email" type="email" autocomplete="email" placeholder="voce@exemplo.com" required maxlength="254" aria-describedby="auth-message"/></div>
-          <label class="auth-password-label" for="auth-password">Senha</label>
+          <label for="auth-email" id="auth-email-label">E-mail</label>
+          <div class="input-wrap" id="auth-email-field"><input id="auth-email" type="email" autocomplete="email" placeholder="voce@exemplo.com" required maxlength="254" aria-describedby="auth-message"/></div>
+          <label class="auth-password-label" for="auth-password" id="auth-password-label">Senha</label>
           <div class="input-wrap"><input id="auth-password" type="password" autocomplete="current-password" placeholder="Mínimo de 8 caracteres" required minlength="8" maxlength="128" aria-describedby="auth-message"/></div>
+          <button class="auth-forgot" id="auth-forgot" type="button">Esqueci minha senha</button>
           <small class="field-error" id="auth-message" role="status" hidden></small>
           <button class="button button-primary modal-submit" id="auth-submit" type="submit">Entrar</button>
         </form>

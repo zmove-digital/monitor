@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "vigia-app-shell-v2";
+const CACHE_NAME = "vigia-app-shell-v3";
 const APP_SHELL = [
   "./",
   "./index.html",

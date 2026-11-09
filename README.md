@@ -44,6 +44,18 @@ O nome do projeto no Cloudflare Pages pode ser `vigia`; o endereço `vigia.monit
 
 Depois do deploy, defina `https://vigia.monitor.com` como URL do app em **Authentication → URL Configuration** no Supabase e inclua essa URL entre as URLs de redirecionamento permitidas.
 
+## Recuperação de senha
+
+O modal de login tem o link **Esqueci minha senha**. O app chama `POST /auth/v1/recover`; o Supabase envia um e-mail com um link que volta para o app com os tokens de recuperação no fragmento da URL. O app detecta `type=recovery`, abre o formulário de nova senha e, ao salvar, chama `PUT /auth/v1/user` e mantém o usuário conectado com a sessão de recuperação.
+
+Configuração necessária no painel do Supabase:
+
+1. Em **Authentication → URL Configuration**, defina **Site URL** com o endereço publicado do app (por exemplo `https://monitor-pge.pages.dev`).
+2. Inclua em **Redirect URLs** as URLs usadas, por exemplo `https://monitor-pge.pages.dev/**` e `https://vigia.monitor.com/**`.
+3. O SMTP padrão do Supabase é limitado (poucos e-mails por hora e somente para endereços autorizados no projeto). Para uso real, configure um SMTP próprio em **Authentication → SMTP Settings** (Resend, SendGrid, Amazon SES etc.).
+
+No APK, o link do e-mail abre no navegador do sistema (o app não registra um App Link próprio): a nova senha é definida na página publicada e, em seguida, basta entrar no aplicativo com ela. Em `localhost` o app não envia `redirect_to`, para que o Supabase use a Site URL configurada.
+
 ## Limites do protótipo
 
 Sem uma conta conectada e um site verificado com snippet instalado, os números do painel são **dados de demonstração**. Com as Edge Functions publicadas e o snippet instalado em um domínio verificado, page views e presença vêm dos eventos gravados no Supabase. Localização e provedor ainda não são coletados e aparecem como indisponíveis.
