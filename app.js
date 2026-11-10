@@ -792,6 +792,13 @@
     updated.textContent = `Atualizado às ${time}`;
   };
 
+  const updateGreeting = () => {
+    const greeting = document.getElementById("greeting");
+    if (!greeting) return;
+    const hour = new Date().getHours();
+    greeting.textContent = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
+  };
+
   const playAlert = async () => {
     const tone = ALERT_TONES[alertTone] || ALERT_TONES.classico;
     try {
@@ -896,6 +903,7 @@
   updateRange("7");
   updateCityPanels(DEMO_CITIES);
   markUpdatedAt();
+  updateGreeting();
   try {
     const storedSession = getAuthStorage().getItem("vigia-session");
     if (storedSession) authSession = JSON.parse(storedSession);
@@ -1438,6 +1446,10 @@
     const activeSite = userSites.find((site) => site.id === activeSiteId);
     if (activeSite) void loadSiteAnalytics(activeSite, { notifyNewVisitors: true });
   }, 15_000);
+
+  // Keep the greeting correct if the app stays open across noon/evening or is resumed later.
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) updateGreeting(); });
+  window.setInterval(updateGreeting, 60_000);
 
   const installButton = document.getElementById("install-app");
   let installPrompt = null;
