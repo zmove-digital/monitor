@@ -7,14 +7,21 @@ import { adminRequest } from "./http.js";
 let cachedAccessToken = null;
 
 const getServiceAccount = () => {
-  const raw = Deno.env.get("FIREBASE_SERVICE_ACCOUNT_JSON");
+  const raw = Deno.env.get("FIREBASE_SERVICE_ACCOUNT_JSON")
+    || Deno.env.get("FIREBASE_SERVICE_ACCOUNT_B64");
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw);
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      // The CLI round-trips multiline JSON poorly; accept a base64 variant too.
+      parsed = JSON.parse(atob(raw.replace(/\s+/g, "")));
+    }
     if (!parsed.client_email || !parsed.private_key || !parsed.project_id) return null;
     return parsed;
   } catch (error) {
-    console.error("Vigia push: FIREBASE_SERVICE_ACCOUNT_JSON inválido.", error.message);
+    console.error("Vigia push: credencial de serviço inválida.", error.message);
     return null;
   }
 };

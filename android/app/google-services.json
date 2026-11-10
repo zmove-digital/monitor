@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "665507909451",
+    "project_id": "zmove-vigia",
+    "storage_bucket": "zmove-vigia.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:665507909451:android:1eb31b041a2965999b22ce",
+        "android_client_info": {
+          "package_name": "com.zmovedigital.vigia"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBHmXLk1JG_oaiMUGVKLtZZ2E-ijNH-BFY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
