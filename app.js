@@ -212,14 +212,17 @@
     const activeSite = userSites.find((site) => site.id === activeSiteId);
     const name = document.getElementById("active-site-name");
     const domain = document.getElementById("active-site-domain");
+    const breadcrumbSite = document.getElementById("breadcrumb-site");
     if (!activeSite) {
       name.textContent = userSites.length ? "Selecione um site" : "Adicione seu site";
       domain.textContent = userSites.length ? `${userSites.length} site(s) na conta` : "Nenhum site conectado";
+      breadcrumbSite.textContent = userSites.length ? "Selecione um site" : "Visão geral";
       renderSiteMenu();
       return;
     }
     name.textContent = activeSite.verified_at ? activeSite.domain : `${activeSite.domain} · não verificado`;
     domain.textContent = "Conta Vigia";
+    breadcrumbSite.textContent = activeSite.domain.toLowerCase();
     renderSiteMenu();
   };
 
@@ -246,9 +249,12 @@
     });
     const maxCount = Math.max(1, ...bins.flatMap((bin) => [bin.views, bin.sessions.size]));
     const scaleMax = Math.max(4, Math.ceil(maxCount / 4) * 4);
-    const makePath = (key) => bins.map((bin, index) => {
+    // bin.sessions is a Set; the series value must be its size, never the object itself.
+    const visitorValues = bins.map((bin) => bin.sessions.size);
+    const viewValues = bins.map((bin) => bin.views);
+    const makePath = (values) => values.map((value, index) => {
       const x = index * 120;
-      const y = 190 - (bin[key] / scaleMax) * 180;
+      const y = 190 - (value / scaleMax) * 180;
       return `${index ? "L" : "M"}${x} ${y.toFixed(1)}`;
     }).join(" ");
     const visitorPath = makePath("sessions");
