@@ -113,6 +113,12 @@ O painel consulta cidade e país derivados no servidor e mostra dois blocos:
 
 Enquanto a Edge Function de ingestão não for republicada com o enriquecimento por cidade (ou enquanto as visitas antigas não tiverem cidade), os blocos mostram “nenhuma cidade identificada”; eventos novos passam a registrar cidade automaticamente, sem migration adicional — as colunas `city` e `country_code` já existiam no esquema.
 
+## Notificações com o app fechado (FCM)
+
+Quando o snippet registra a primeira `page_view` de uma sessão de visitante, a Edge Function `vigia-ingest` dispara uma **notificação push** ao dono do site via Firebase Cloud Messaging (HTTP v1 em `_shared/push.js`); apenas a chegada de uma sessão nova notifica, e visitas repetidas do mesmo visitante ficam silenciosas. O APK registra seu token de dispositivo na `vigia-push` (função com `verify_jwt`), que grava em `push_tokens`; ao sair da conta o token é removido, e o interruptor "Notificação" do painel liga/desliga.
+
+Configuração exigida: projeto Firebase com app Android `com.zmovedigital.vigia` (`android/app/google-services.json`) e secret `FIREBASE_SERVICE_ACCOUNT_JSON` no Supabase contendo o JSON da conta de serviço com papel de mensagens FCM. Sem a secret, a ingestão continua funcionando apenas sem envio de push.
+
 ## Requisitos de privacidade
 
 - Coletar somente os dados necessários para métricas de páginas, cidade e país aproximados.

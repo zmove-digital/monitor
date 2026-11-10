@@ -6,6 +6,7 @@ import {
   readJson,
   RequestError,
 } from "../_shared/http.js";
+import { sendPushToUsers } from "../_shared/push.js";
 
 const isUuid = (value) => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
@@ -43,6 +44,16 @@ const cleanPath = (value) => {
 const isAllowedReferrer = (value) => typeof value === "string"
   && value.length <= 253
   && /^[a-z0-9.-]+$/i.test(value);
+
+// A "new visit" is the first page_view of a visitor session; only these trigger
+// the owner's push notification, so returning navigations stay quiet.
+const isNewVisitorSession = async (siteId, visitorSessionId) => {
+  const existing = await adminRequest(
+    `/rest/v1/site_events?site_id=eq.${encodeURIComponent(siteId)}`
+      + `&visitor_session_id=eq.${encodeURIComponent(visitorSessionId)}&select=visitor_session_id&limit=1`,
+  );
+  return !existing?.length;
+};
 
 // City enrichment uses the request IP only for a momentary lookup. The IP itself is
 // never persisted, logged by this code or exposed; only the coarse city/country is kept.
@@ -131,6 +142,16 @@ Deno.serve(async (request) => {
     const geo = await lookupGeo(getClientIp(request));
     const geoFields = geo ? { country_code: geo.countryCode, city: geo.city } : {};
 
+    // Must run before the event is stored, otherwise the session already exists.
+    let shouldNotifyOwner = false;
+    if (eventType === "page_view") {
+      try {
+        shouldNotifyOwner = await isNewVisitorSession(site.id, body.visitor_session_id);
+      } catch (error) {
+        console.warn("Vigia new-session check skipped:", error.message);
+      }
+    }
+
     if (eventType === "page_view" || eventType === "page_exit") {
       const duration = Number.isInteger(body.page_duration_seconds)
         ? Math.min(86400, Math.max(0, body.page_duration_seconds))
@@ -169,6 +190,23 @@ Deno.serve(async (request) => {
           ...geoFields,
         },
       });
+    }
+
+    if (shouldNotifyOwner) {
+      try {
+        await sendPushToUsers([site.owner_id], {
+          title: `Vigia · ${site.domain}`,
+          body: `Nova visita em ${pagePath}${geo?.city ? ` · ${geo.city}` : ""}`,
+          data: {
+            kind: "new_visitor",
+            site_id: site.id,
+            page_path: pagePath,
+            visitor_session_id: body.visitor_session_id,
+          },
+        });
+      } catch (error) {
+        console.warn("Vigia push skipped:", error.message);
+      }
     }
 
     return jsonResponse({ accepted: true }, 200, origin);

@@ -935,6 +935,108 @@
       soundEnabled ? "Prévia reproduzida. Os avisos de acesso exigem site verificado e snippet instalado." : "Nenhum som será reproduzido.");
   });
 
+  // Push notifications (APK): avisam sobre novas visitas com o aplicativo fechado.
+  const pushToggle = document.getElementById("push-toggle");
+  const pushStatus = document.getElementById("push-status");
+  const pushPlugin = window.Capacitor?.isNativePlatform?.() ? window.Capacitor?.Plugins?.PushNotifications : null;
+  let pushEnabled = true;
+  let pushRegisteredToken = null;
+  let pushListenersBound = false;
+
+  try {
+    pushEnabled = window.localStorage.getItem("vigia-push") !== "off";
+  } catch {
+    pushEnabled = true;
+  }
+
+  if (!pushPlugin) pushToggle.hidden = true;
+
+  const setPushUi = (enabled) => {
+    pushToggle.setAttribute("aria-pressed", String(enabled));
+    pushStatus.textContent = enabled ? "Ativada" : "Desativada";
+  };
+
+  const registerPushTokenWithServer = async (token) => {
+    const session = await getSession();
+    if (!session) throw new Error("Entre com sua conta para ativar as notificações.");
+    await supabaseRequest("/functions/v1/vigia-push", {
+      method: "POST",
+      body: { action: "register", token },
+      accessToken: session.access_token,
+    });
+    pushRegisteredToken = token;
+    setPushUi(true);
+    showToast("Notificações ativadas", "Você será avisado de novas visitas com o app fechado.");
+  };
+
+  const setupPushNotifications = async () => {
+    if (!pushPlugin || !authSession) return;
+    try {
+      const permission = await pushPlugin.requestPermissions();
+      if (permission.receive !== "granted") {
+        setPushUi(false);
+        showToast("Permissão ausente", "Autorize as notificações do Vigia nas configurações do Android.", true);
+        return;
+      }
+      if (!pushListenersBound) {
+        pushListenersBound = true;
+        pushPlugin.addListener("registration", ({ value }) => {
+          void registerPushTokenWithServer(value).catch((error) => {
+            showToast("Notificação indisponível", error.message, true);
+          });
+        });
+        pushPlugin.addListener("registrationError", () => {
+          setPushUi(false);
+        });
+        pushPlugin.addListener("pushNotificationReceived", () => {
+          const site = userSites.find((item) => item.id === activeSiteId);
+          if (site) void loadSiteAnalytics(site, { notifyNewVisitors: true });
+        });
+      }
+      await pushPlugin.register();
+    } catch (error) {
+      setPushUi(false);
+      showToast("Notificação indisponível", error.message, true);
+    }
+  };
+
+  setPushUi(pushEnabled);
+  if (authSession && pushEnabled) void setupPushNotifications();
+
+  pushToggle.addEventListener("click", async () => {
+    const session = await getSession();
+    if (!session) {
+      showAuthModal();
+      return;
+    }
+    const enabling = !pushEnabled;
+    pushEnabled = enabling;
+    persist("vigia-push", enabling ? "on" : "off");
+    setPushUi(enabling);
+    if (enabling) {
+      if (pushRegisteredToken) {
+        try {
+          await registerPushTokenWithServer(pushRegisteredToken);
+        } catch (error) {
+          showToast("Notificação indisponível", error.message, true);
+        }
+      } else if (pushPlugin) {
+        await setupPushNotifications();
+      }
+      return;
+    }
+    try {
+      await supabaseRequest("/functions/v1/vigia-push", {
+        method: "POST",
+        body: { action: "unregister", ...(pushRegisteredToken ? { token: pushRegisteredToken } : {}) },
+        accessToken: session.access_token,
+      });
+    } catch (error) {
+      showToast("Não foi possível desativar no servidor", error.message, true);
+    }
+    showToast("Notificações desativadas", "Sem avisos de novas visitas com o app fechado.");
+  });
+
   document.getElementById("date-range").addEventListener("change", async (event) => {
     if (activeSiteId) {
       const site = userSites.find((item) => item.id === activeSiteId);
@@ -1094,6 +1196,16 @@
       return;
     }
     try {
+      try {
+        await supabaseRequest("/functions/v1/vigia-push", {
+          method: "POST",
+          body: { action: "unregister" },
+          accessToken: authSession.access_token,
+        });
+      } catch {
+        // Best-effort: sign-out proceeds even if the token cleanup fails.
+      }
+      pushRegisteredToken = null;
       await supabaseRequest("/auth/v1/logout", { method: "POST", accessToken: authSession.access_token });
     } catch (error) {
       showToast("Não foi possível encerrar a sessão", error.message, true);
@@ -1221,6 +1333,7 @@
       authModal.hidden = true;
       authPassword.value = "";
       await loadSites();
+      void setupPushNotifications();
       showToast("Bem-vindo ao Vigia", "Sua conta foi conectada ao projeto Supabase.");
       if (pendingDomain) await registerSite(pendingDomain);
     } catch (error) {
