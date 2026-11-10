@@ -14,7 +14,7 @@ O service worker mantém apenas o shell estático do app em cache. Chamadas ao S
 
 ## APK Android de teste
 
-O projeto também pode ser empacotado com Capacitor. O APK de depuração contém a interface web do Vigia e usa o Supabase configurado em `supabase-config.js`; é necessário ter conexão com a internet para autenticar e carregar métricas. O endereço `trackerUrl` nessa configuração determina a URL do `vigia.js` mostrada no passo de instalação do snippet.
+O projeto também pode ser empacotado com Capacitor. O APK de depuração contém a interface web do Vigia e usa o Supabase configurado em `supabase-config.js`; é necessário ter conexão com a internet para autenticar e carregar métricas. O endereço `trackerUrl` nessa configuração determina a URL do `vigia.js` mostrada no passo de instalação do snippet. No APK a sessão do painel fica em `localStorage` e sobrevive a fechar e reabrir o aplicativo; no navegador ela fica em `sessionStorage` e encerra junto com a aba. Ao sair pelo botão **Sair**, a sessão é removida do armazenamento usado.
 
 Requisitos de build: Node.js 22 ou superior, JDK 21 e Android SDK instalado com a plataforma Android 36. Na raiz do projeto, instale as dependências e gere o APK:
 

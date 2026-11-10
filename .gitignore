@@ -4,6 +4,7 @@ node_modules/
 .env
 .env.*
 supabase/functions/.env
+supabase/.temp/
 android/.gradle/
 android/.idea/
 android/**/build/

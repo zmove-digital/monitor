@@ -89,19 +89,28 @@
     }
   };
 
+  // No APK (Capacitor) a sessão precisa sobreviver a fechar e reabrir o app;
+  // no navegador, mantenho o escopo da aba (sessionStorage) por privacidade.
+  const getAuthStorage = () => {
+    const isNative = Boolean(window.Capacitor?.isNativePlatform?.());
+    return isNative ? window.localStorage : window.sessionStorage;
+  };
+
   const clearSession = () => {
     authSession = null;
     try {
-      sessionStorage.removeItem("vigia-session");
+      getAuthStorage().removeItem("vigia-session");
+      window.sessionStorage.removeItem("vigia-session");
+      window.localStorage.removeItem("vigia-session");
     } catch {
-      // Session storage is optional; the signed-in state is cleared in memory.
+      // Storage optional; the signed-out state is cleared in memory.
     }
   };
 
   const saveSession = (session) => {
     authSession = session;
     try {
-      sessionStorage.setItem("vigia-session", JSON.stringify(session));
+      getAuthStorage().setItem("vigia-session", JSON.stringify(session));
     } catch {
       showToast("Sessão não persistida", "A sessão ficará disponível apenas até esta página ser fechada.", true);
     }
@@ -872,7 +881,7 @@
   updateCityPanels(DEMO_CITIES);
   markUpdatedAt();
   try {
-    const storedSession = sessionStorage.getItem("vigia-session");
+    const storedSession = getAuthStorage().getItem("vigia-session");
     if (storedSession) authSession = JSON.parse(storedSession);
   } catch {
     authSession = null;
