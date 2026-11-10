@@ -213,16 +213,23 @@
     const name = document.getElementById("active-site-name");
     const domain = document.getElementById("active-site-domain");
     const breadcrumbSite = document.getElementById("breadcrumb-site");
+    const topbarSite = document.getElementById("topbar-site");
     if (!activeSite) {
       name.textContent = userSites.length ? "Selecione um site" : "Adicione seu site";
       domain.textContent = userSites.length ? `${userSites.length} site(s) na conta` : "Nenhum site conectado";
       breadcrumbSite.textContent = userSites.length ? "Selecione um site" : "Visão geral";
+      topbarSite.hidden = true;
       renderSiteMenu();
       return;
     }
     name.textContent = activeSite.verified_at ? activeSite.domain : `${activeSite.domain} · não verificado`;
     domain.textContent = "Conta Vigia";
     breadcrumbSite.textContent = activeSite.domain.toLowerCase();
+    topbarSite.hidden = false;
+    topbarSite.textContent = activeSite.domain.toLowerCase();
+    topbarSite.title = activeSite.verified_at
+      ? `${activeSite.domain} — em monitoramento`
+      : `${activeSite.domain} — aguardando verificação`;
     renderSiteMenu();
   };
 
