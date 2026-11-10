@@ -1072,6 +1072,8 @@
   modal.addEventListener("click", (event) => { if (event.target === modal) closeModal(); });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
+    const popover = document.getElementById("source-popover");
+    if (popover && !popover.hidden) { popover.hidden = true; return; }
     if (!authModal.hidden) authModal.hidden = true;
     else if (!modal.hidden) closeModal();
   });
@@ -1387,16 +1389,41 @@
       button.classList.remove("is-refreshing");
     }
   });
+  const sourcePopover = document.getElementById("source-popover");
+  const sourcePopoverList = document.getElementById("source-popover-list");
+  const sourcePopoverNote = document.getElementById("source-popover-note");
+  sourcePopover.addEventListener("click", () => { sourcePopover.hidden = true; });
   document.getElementById("show-sources").addEventListener("click", () => {
+    sourcePopoverList.replaceChildren();
     if (!sourceBreakdown.length) {
-      showToast("Origens de tráfego", "Os canais exibidos são exemplos e não vêm de uma fonte de analytics.");
-      return;
+      sourcePopoverList.hidden = true;
+      sourcePopoverNote.textContent = "Os canais exibidos são exemplos e não vêm de uma fonte de analytics. Conecte um site verificado para ver as origens reais.";
+    } else {
+      sourcePopoverList.hidden = false;
+      const total = sourceBreakdown.reduce((sum, [, count]) => sum + count, 0);
+      sourceBreakdown.slice(0, 12).forEach(([name, count]) => {
+        const percentage = total ? Math.round((count / total) * 100) : 0;
+        const row = document.createElement("div");
+        row.className = "source-popover-row";
+        const meta = document.createElement("div");
+        meta.className = "source-popover-meta";
+        const label = document.createElement("span");
+        label.textContent = name;
+        const value = document.createElement("strong");
+        value.textContent = `${formatNumber(count)} · ${percentage}%`;
+        meta.append(label, value);
+        const track = document.createElement("div");
+        track.className = "progress-track";
+        const bar = document.createElement("i");
+        bar.className = "bar-purple";
+        bar.style.width = `${percentage}%`;
+        track.append(bar);
+        row.append(meta, track);
+        sourcePopoverList.append(row);
+      });
+      sourcePopoverNote.textContent = "O Google só é separado quando o navegador envia o referrer do Google ou parâmetros de campanha (gclid, utm_source); sem esses sinais, a visita fica em Acesso direto.";
     }
-    const summary = sourceBreakdown
-      .slice(0, 6)
-      .map(([name, count]) => `${name}: ${formatNumber(count)}`)
-      .join(" · ");
-    showToast("Origens de tráfego", `${summary}. O Google só é separado quando o navegador envia o referrer do Google ou parâmetros de campanha (gclid, utm_source); sem esses sinais, a visita fica em Acesso direto.`);
+    sourcePopover.hidden = false;
   });
   document.getElementById("show-pages").addEventListener("click", () => showToast("Páginas populares", "As páginas e tempos exibidos são dados de demonstração."));
 
