@@ -219,4 +219,9 @@ body.dark .topbar-site { border-color: #34384c; }
   .cities-list { max-height: 240px; }
   .city-stats .progress-track { width: 52px; }
   .tone-picker { padding: 4px 6px; }
+  /* The alert toggles + tone picker do not fit on one line at phone widths.
+     Without wrapping, they widen the layout viewport and push fixed overlays
+     (source popover, toasts) past the right edge of the screen. */
+  .live-right { flex-wrap: wrap; justify-content: flex-start; row-gap: 8px; padding-left: 0; }
+  .live-right .tone-picker { margin-left: auto; }
 }
