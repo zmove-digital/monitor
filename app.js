@@ -268,8 +268,8 @@
       const y = 190 - (value / scaleMax) * 180;
       return `${index ? "L" : "M"}${x} ${y.toFixed(1)}`;
     }).join(" ");
-    const visitorPath = makePath("sessions");
-    const viewsPath = makePath("views");
+    const visitorPath = makePath(visitorValues);
+    const viewsPath = makePath(viewValues);
     document.querySelector(".line-visitors").setAttribute("d", visitorPath);
     document.querySelector(".line-views").setAttribute("d", viewsPath);
     document.querySelector(".area-path").setAttribute("d", `${visitorPath} L720 200 L0 200Z`);
@@ -435,6 +435,9 @@
   };
 
   const renderSiteAnalytics = (site, events, visitors, notifyNewVisitors) => {
+    // Supabase errors or empty responses must never crash the render pipeline.
+    events = Array.isArray(events) ? events : [];
+    visitors = Array.isArray(visitors) ? visitors : [];
     const pageViews = events.filter((event) => event.event_type === "page_view");
     const sessionCounts = new Map();
     pageViews.forEach((event) => sessionCounts.set(event.visitor_session_id, (sessionCounts.get(event.visitor_session_id) || 0) + 1));
