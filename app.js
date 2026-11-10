@@ -214,13 +214,15 @@
     const domain = document.getElementById("active-site-domain");
     const breadcrumbSite = document.getElementById("breadcrumb-site");
     const topbarSite = document.getElementById("topbar-site");
+    // Single source of truth for the demo warning: it is only meaningful when the
+    // account has no connected site. Any connected site (selected or not) hides it,
+    // regardless of whether analytics finished loading.
+    document.querySelector(".demo-notice").hidden = userSites.length > 0;
     if (!activeSite) {
       name.textContent = userSites.length ? "Selecione um site" : "Adicione seu site";
       domain.textContent = userSites.length ? `${userSites.length} site(s) na conta` : "Nenhum site conectado";
       breadcrumbSite.textContent = userSites.length ? "Selecione um site" : "Visão geral";
       topbarSite.hidden = true;
-      // Demo warning belongs only to the state without a monitored site.
-      document.querySelector(".demo-notice").hidden = userSites.length > 0;
       renderSiteMenu();
       return;
     }
