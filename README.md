@@ -58,14 +58,14 @@ No APK, o link do e-mail abre no navegador do sistema (o app não registra um Ap
 
 ## Limites do protótipo
 
-Sem uma conta conectada e um site verificado com snippet instalado, os números do painel são **dados de demonstração**. Com as Edge Functions publicadas e o snippet instalado em um domínio verificado, page views e presença vêm dos eventos gravados no Supabase. Localização e provedor ainda não são coletados e aparecem como indisponíveis.
+Sem uma conta conectada e um site verificado com snippet instalado, os números do painel são **dados de demonstração**. Com as Edge Functions publicadas e o snippet instalado em um domínio verificado, page views, presença e cidades vêm dos eventos gravados no Supabase. O provedor de internet não é coletado e aparece como indisponível.
 
 ## Supabase e coleta de acessos
 
 A migration `supabase/migrations/20261101123000_vigia_initial_schema.sql` cria o cadastro de sites, eventos de página, presença temporária e desafios privados de verificação com RLS. Ela já foi aplicada ao projeto VIGIA. As Edge Functions estão em `supabase/functions/`:
 
 - `vigia-verification` cria tokens DNS TXT que expiram em 24 horas e só marca um site como verificado depois de encontrar o token no DNS público. A função exige a sessão autenticada do proprietário.
-- `vigia-ingest` aceita page views, encerramentos e heartbeats apenas para domínios verificados, conferindo a origem do navegador contra o domínio cadastrado.
+- `vigia-ingest` aceita page views, encerramentos e heartbeats apenas para domínios verificados, conferindo a origem do navegador contra o domínio cadastrado. Ele também deriva **cidade e país aproximados** do IP da requisição via ipwho.is: o IP é consultado momentaneamente em memória (cache de até 24 h por IP), descartado na sequência e nunca gravado; só a cidade e o código de país chegam ao banco.
 
 Para publicar as funções no projeto `cmclojrcwjrfezoaidzw`, instale o [Supabase CLI](https://supabase.com/docs/guides/cli), autentique-se na sua máquina e execute:
 
@@ -82,11 +82,11 @@ O runtime do Supabase fornece `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` às f
 
 Depois de publicar as funções e fazer um novo deploy do Pages, registre o domínio no painel, publique o TXT indicado pelo Vigia e confirme a verificação. Após a confirmação, copie o snippet exibido pelo app e coloque-o antes do fechamento de `</body>` em cada página que deseja medir. O trecho carregado é `tracking/vigia.js`, publicado como `/vigia.js` no Pages. O painel coleta page views e presença ativa, com heartbeat a cada 25 segundos e expiração da presença após 90 segundos.
 
-O snippet envia somente o domínio do site, um identificador aleatório efêmero por aba, o caminho da página sem query string nem fragmento, o domínio de referência e duração aproximada. **Nenhum IP é lido, armazenado ou enviado pelo código do Vigia.** Nesta versão, cidade, país e provedor ficam indisponíveis. O identificador de sessão é mantido em `sessionStorage` e termina com a sessão da aba. O proprietário do site deve informar os visitantes sobre analytics e configurar consentimento quando exigido pela legislação aplicável.
+O snippet envia somente o domínio do site, um identificador aleatório efêmero por aba, o caminho da página sem query string nem fragmento, o domínio de referência e duração aproximada. **Nenhum IP é lido, armazenado ou enviado pelo código do Vigia.** A cidade e o país aproximados são derivados **no servidor** pela Edge Function de ingestão, usando o IP da requisição apenas por um instante (cache de até 24 h por IP); o IP nunca é gravado no banco nem nos logs do código. O provedor de internet não é coletado. O identificador de sessão é mantido em `sessionStorage` e termina com a sessão da aba. O proprietário do site deve informar os visitantes sobre analytics e configurar consentimento quando exigido pela legislação aplicável.
 
 O endpoint de ingestão é público por natureza; ele exige site verificado e confere a origem do navegador, mas não inclui ainda limitação distribuída de taxa nem proteção contra clientes que falsifiquem cabeçalhos HTTP fora de um navegador. Trate esta versão como piloto controlado, não como serviço endurecido para produção. Também defina uma política de retenção e configure a limpeza periódica de eventos antes de ampliar a coleta.
 
-A preferência de alerta sonoro fica no navegador e a ativação toca uma prévia curta. Quando há presença real, o painel consulta o Supabase a cada 15 segundos e pode avisar sobre novos visitantes; não há conexão realtime persistente nesta versão.
+A preferência de alerta sonoro fica no navegador e a ativação toca uma prévia curta. O painel oferece quatro toques (Clássico, Suave, Urgente e Sino) em um seletor ao lado do interruptor; a escolha fica salva e a prévia toca a cada troca. Quando há presença real, o painel consulta o Supabase a cada 15 segundos e o botão de atualizar força a recarga imediata, marcando o horário da última atualização.
 
 ## Origem do tráfego
 
@@ -102,9 +102,20 @@ O snippet guarda a origem da primeira página vista em `sessionStorage` e reapro
 
 **Limite importante:** só é possível identificar o Google quando o navegador envia o referenciador ou parâmetros de campanha. Visitas com referenciador removido (apps, modo privado, política `no-referrer`, HTTP→HTTPS) permanecem como **Acesso direto** e não há como saber se vieram de busca. O botão **Ver todas as origens** mostra os domínios brutos que mais contribuíram para os canais.
 
+A barra de navegação foi movida para o **topo** (marca, seletor de site, seções e conta), deixando os painéis ocupando toda a largura. Na largura de celular as seções ficam só com ícones.
+
+## Cidades por visita
+
+O painel consulta cidade e país derivados no servidor e mostra dois blocos:
+
+- **Cidades**: todas as cidades que registraram acessos no período, com visitantes únicos e a participação relativa à líder.
+- **Top 5 cidades**: as cinco com mais visitantes únicos no período, com barra comparativa.
+
+Enquanto a Edge Function de ingestão não for republicada com o enriquecimento por cidade (ou enquanto as visitas antigas não tiverem cidade), os blocos mostram “nenhuma cidade identificada”; eventos novos passam a registrar cidade automaticamente, sem migration adicional — as colunas `city` e `country_code` já existiam no esquema.
+
 ## Requisitos de privacidade
 
-- Coletar somente os dados necessários para métricas de páginas e localização/provedor aproximados.
-- O código de tracking atual não usa o IP. Se enriquecimento aproximado por IP for adicionado no futuro, usar o IP apenas transitoriamente e não reter nem expor o endereço completo.
-- Informar que geolocalização por IP pode ser imprecisa. Não inferir localização precisa nem criar fingerprint de visitantes.
+- Coletar somente os dados necessários para métricas de páginas, cidade e país aproximados.
+- O código do snippet não usa nem envia IP. No servidor, o IP é lido apenas por um instante para derivar cidade e país e imediatamente descartado; o endereço completo não é retido, gravado no banco nem exposto nos painéis.
+- Informar que geolocalização por IP é aproximada e pode ser imprecisa. Não inferir localização precisa nem criar fingerprint de visitantes.
 - Definir retenção, controles de acesso e aviso de privacidade antes de coletar dados reais.

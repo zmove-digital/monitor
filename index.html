@@ -21,14 +21,13 @@
   </head>
   <body>
     <div class="app-shell">
-      <aside class="sidebar" aria-label="Navegação principal">
+      <aside class="sidebar" aria-label="Barra superior do painel">
         <a class="brand" href="#" aria-label="Vigia — início">
           <span class="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 32 32" fill="none"><path d="M3.5 16s4.5-8 12.5-8 12.5 8 12.5 8-4.5 8-12.5 8S3.5 16 3.5 16Z" stroke="currentColor" stroke-width="2.3"/><circle cx="16" cy="16" r="4" fill="currentColor"/></svg>
           </span>
           <span class="brand-name">vigia<span>.</span></span>
         </a>
-        <div class="workspace-label">ESPAÇO DE TRABALHO</div>
         <button class="site-switcher" id="site-switcher" type="button" aria-label="Adicionar um site">
           <span class="site-favicon">L</span>
           <span class="site-switcher-copy"><strong id="active-site-name">Loja exemplo</strong><small id="active-site-domain">loja.exemplo.com</small></span>
@@ -40,15 +39,10 @@
           <a class="nav-link" href="#visitors"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8" cy="6.5" r="3"/><path d="M2.8 16.5c.5-3 2.2-4.5 5.2-4.5s4.7 1.5 5.2 4.5M14 4.2a3 3 0 0 1 0 5.8m1 2.2c1.4.6 2.2 2 2.4 4.3"/></svg>Visitantes<span class="nav-count" id="nav-live-count">3</span></a>
           <a class="nav-link" href="#pages"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 2.8h6l4 4v10.4H5z"/><path d="M11 3v4h4M7.5 11h5M7.5 14h5"/></svg>Páginas</a>
         </nav>
+        <button class="icon-button refresh-button-top" id="refresh-data" type="button" aria-label="Atualizar dados do painel" title="Atualizar dados"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16.3 8A6.5 6.5 0 0 0 5 5.5L3.5 7M3.7 12A6.5 6.5 0 0 0 15 14.5l1.5-1.5M3.5 3.5V7h3.5M16.5 16.5V13H13"/></svg></button>
         <div class="sidebar-bottom">
-          <div class="privacy-card">
-            <span class="privacy-icon"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 16 5v4.6c0 3.6-2.4 6.3-6 7.9-3.6-1.6-6-4.3-6-7.9V5l6-2.5Z"/><path d="m7.5 10 1.7 1.7 3.5-3.5"/></svg></span>
-            <strong>Privacidade em primeiro lugar</strong>
-            <p>Sem fingerprinting. Sem coleta de IP; localização indisponível nesta versão.</p>
-            <a href="#privacy">Saiba como funciona <span aria-hidden="true">→</span></a>
-          </div>
           <button class="profile-button" type="button" aria-label="Perfil de demonstração">
-            <span class="avatar">M</span><span><strong>Meu espaço</strong><small>Plano gratuito</small></span>
+            <span class="avatar">M</span><span><strong>Meu espaço</strong><small>Entre para conectar sites</small></span>
             <svg class="more-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="16" cy="10" r="1"/></svg>
           </button>
         </div>
@@ -58,6 +52,7 @@
         <header class="topbar">
           <div class="breadcrumb"><span>Seu espaço</span><span class="breadcrumb-divider">/</span><strong>Visão geral</strong></div>
           <div class="topbar-actions">
+            <span class="updated-note" id="updated-at" title="Horário da última atualização dos dados">—</span>
             <span class="demo-badge"><span></span>MODO DEMONSTRAÇÃO</span>
             <button class="icon-button theme-toggle" id="theme-toggle" type="button" aria-label="Ativar tema escuro" title="Alternar tema">
               <svg class="sun-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.5"/><path d="M10 1.8v2M10 16.2v2M18.2 10h-2M3.8 10h-2m14-5.8-1.4 1.4M5.6 14.4l-1.4 1.4m11.6 0-1.4-1.4M5.6 5.6 4.2 4.2"/></svg>
@@ -84,6 +79,7 @@
             </div>
             <div class="live-right"><div class="visitor-count"><strong id="live-visitors">3</strong><span>visitantes</span></div><div class="live-divider"></div>
               <button class="sound-control" id="sound-toggle" type="button" aria-pressed="false"><span class="sound-switch"><span></span></span><span class="sound-copy"><strong>Alerta sonoro</strong><small id="sound-status">Desativado</small></span><svg class="sound-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 8v4h3l4 3V5L6 8H3Zm10-1a4 4 0 0 1 0 6m2-8a7 7 0 0 1 0 10"/></svg></button>
+              <label class="tone-picker" for="sound-tone"><span>Toque</span><select id="sound-tone" aria-label="Toque do alerta sonoro"><option value="classico">Clássico</option><option value="suave">Suave</option><option value="urgente">Urgente</option><option value="sino">Sino</option></select></label>
             </div>
           </section>
 
@@ -121,8 +117,8 @@
           <section class="dashboard-grid lower-grid">
             <article class="panel visitors-panel" id="visitors">
               <div class="panel-header"><div><div class="title-with-live"><h2>Visitantes agora</h2><span class="tiny-live"><i></i>AO VIVO</span></div><p>Atividade recente no seu site</p></div><button class="text-button refresh-button" id="refresh-visitors" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16.3 8A6.5 6.5 0 0 0 5 5.5L3.5 7M3.7 12A6.5 6.5 0 0 0 15 14.5l1.5-1.5M3.5 3.5V7h3.5M16.5 16.5V13H13"/></svg>Atualizar</button></div>
-              <div class="visitor-table-wrap"><table class="visitor-table"><thead><tr><th>LOCALIZAÇÃO APROXIMADA</th><th>PÁGINA ATUAL</th><th>HÁ QUANTO TEMPO</th><th>PROVEDOR</th></tr></thead><tbody id="visitor-rows"></tbody></table></div>
-              <div class="table-footnote"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 7.5v3M8 5.2v.1"/></svg>Localização e provedor indisponíveis nesta versão. O Vigia não coleta nem armazena IP.</div>
+              <div class="visitor-table-wrap"><table class="visitor-table"><thead><tr><th>LOCALIZAÇÃO APROXIMADA</th><th>PÁGINA ATUAL</th><th>HÁ QUANTO TEMPO</th></tr></thead><tbody id="visitor-rows"></tbody></table></div>
+              <div class="table-footnote"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 7.5v3M8 5.2v.1"/></svg>Cidade aproximada derivada no servidor; o IP é descartado e nunca fica armazenado. Sem fingerprinting.</div>
             </article>
             <article class="panel pages-panel" id="pages">
               <div class="panel-header"><div><h2>Páginas populares</h2><p>Mais visitadas neste período</p></div><button class="more-button" type="button" aria-label="Mais opções de páginas">•••</button></div>
@@ -135,7 +131,17 @@
               <button class="text-button pages-link" id="show-pages" type="button">Ver todas as páginas <span aria-hidden="true">→</span></button>
             </article>
           </section>
-          <footer class="footer-note" id="privacy"><span>Vigia <span class="footer-dot">·</span> Monitoramento simples, privacidade respeitada.</span><span>Sem localização nesta versão. Sem coleta de IP ou fingerprinting.</span></footer>
+          <section class="dashboard-grid lower-grid">
+            <article class="panel cities-panel" id="cities" aria-labelledby="cities-heading">
+              <div class="panel-header"><div id="cities-heading" class="heading-only"><h2>Cidades</h2><p>Todas as cidades que registram acessos no período</p></div><span class="cities-total"><strong id="cities-total">6</strong><span>cidades</span></span></div>
+              <div class="cities-list" id="cities-list"></div>
+            </article>
+            <article class="panel top-cities-panel" aria-labelledby="top-cities-heading">
+              <div class="panel-header"><div><h2 id="top-cities-heading">Top 5 cidades</h2><p>Mais visitantes no período</p></div></div>
+              <div class="cities-list top-cities" id="top-cities-list"></div>
+            </article>
+          </section>
+          <footer class="footer-note" id="privacy"><span>Vigia <span class="footer-dot">·</span> Monitoramento simples, privacidade respeitada.</span><span>Cidade aproximada pelo acesso, sem guardar IP. Sem fingerprinting.</span></footer>
         </div>
       </main>
     </div>
@@ -173,7 +179,7 @@
           <h3 id="tracking-heading">Instale o snippet no site</h3>
           <p class="verification-description">Cole este código antes de <code>&lt;/body&gt;</code> em todas as páginas que deseja medir.</p>
           <div class="copy-field code-field"><code id="tracking-snippet"></code><button class="copy-button" type="button" data-copy="tracking-snippet">Copiar</button></div>
-          <p class="verification-description">O painel começará a mostrar os acessos após a instalação. A localização e o provedor ficam indisponíveis nesta primeira versão.</p>
+          <p class="verification-description">O painel começará a mostrar os acessos após a instalação. A cidade é aproximada no servidor, sem armazenar IP; o provedor não é coletado.</p>
           <div class="modal-actions"><button class="button button-primary modal-submit" id="tracking-done" type="button">Concluir</button></div>
         </section>
         <div class="modal-privacy"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2 13 4v3.8c0 3-2 5.2-5 6.6-3-1.4-5-3.6-5-6.6V4l5-2Z"/></svg>Seus dados são tratados com privacidade desde o início.</div>

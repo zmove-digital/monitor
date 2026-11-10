@@ -40,6 +40,16 @@
   let lastPresenceSiteId = null;
   let knownVisitorIds = new Set();
   let soundEnabled = false;
+  let alertTone = "classico";
+  const DEMO_CITIES = [
+    { city: "Campinas", country: "BR", visitors: 614 },
+    { city: "Valinhos", country: "BR", visitors: 187 },
+    { city: "Vinhedo", country: "BR", visitors: 121 },
+    { city: "São Paulo", country: "BR", visitors: 106 },
+    { city: "Sumaré", country: "BR", visitors: 88 },
+    { city: "Jundiaí", country: "BR", visitors: 71 },
+    { city: "Limeira", country: "BR", visitors: 55 },
+  ];
   let sourceBreakdown = [];
   let recoverySession = null;
 
@@ -208,7 +218,7 @@
     visitorRows.replaceChildren();
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 4;
+    cell.colSpan = 3;
     cell.className = "empty-data-cell";
     cell.textContent = message;
     row.append(cell);
@@ -326,6 +336,78 @@
     });
   };
 
+  const cityList = document.getElementById("cities-list");
+  const cityTotal = document.getElementById("cities-total");
+  const topCityList = document.getElementById("top-cities-list");
+
+  const flagForCountry = (country) => country === "BR" ? "🇧🇷" : country === "PT" ? "🇵🇹" : "🌐";
+
+  // Counts unique visitor sessions per city across the selected period.
+  const aggregateCityRanking = (events) => {
+    const cityStats = new Map();
+    events.forEach((event) => {
+      if (!event.city) return;
+      const entry = cityStats.get(event.city) || { country: null, sessions: new Set() };
+      entry.sessions.add(event.visitor_session_id);
+      if (!entry.country && event.country_code) entry.country = event.country_code;
+      cityStats.set(event.city, entry);
+    });
+    return [...cityStats.entries()]
+      .map(([city, entry]) => ({ city, country: entry.country, visitors: entry.sessions.size }))
+      .sort((a, b) => b.visitors - a.visitors || a.city.localeCompare(b.city, "pt-BR"));
+  };
+
+  const renderCityRows = (container, ranking, { limit = Number.MAX_SAFE_INTEGER, withBars = false } = {}) => {
+    container.replaceChildren();
+    const slice = ranking.slice(0, limit);
+    if (!slice.length) {
+      const empty = document.createElement("p");
+      empty.className = "empty-data-message";
+      empty.textContent = "Por enquanto, nenhuma cidade foi identificada para o site neste período.";
+      container.append(empty);
+      return;
+    }
+    const top = slice[0].visitors || 1;
+    slice.forEach((item, index) => {
+      const row = document.createElement("div");
+      row.className = "city-row";
+      const rank = document.createElement("span");
+      rank.className = "city-rank";
+      rank.textContent = String(index + 1).padStart(2, "0");
+      const info = document.createElement("div");
+      info.className = "city-info";
+      const name = document.createElement("strong");
+      name.textContent = item.city;
+      const detail = document.createElement("small");
+      detail.textContent = item.country ? `${flagForCountry(item.country)} ${item.country}` : "País não identificado";
+      info.append(name, detail);
+      const stats = document.createElement("div");
+      stats.className = "city-stats";
+      const count = document.createElement("strong");
+      count.textContent = formatNumber(item.visitors);
+      const share = document.createElement("small");
+      share.textContent = `${Math.round((item.visitors / top) * 100)}%`;
+      stats.append(count, share);
+      if (withBars) {
+        const track = document.createElement("div");
+        track.className = "progress-track";
+        const bar = document.createElement("i");
+        bar.className = "bar-purple";
+        bar.style.width = `${Math.max(6, Math.round((item.visitors / top) * 100))}%`;
+        track.append(bar);
+        stats.append(track);
+      }
+      row.append(rank, info, stats);
+      container.append(row);
+    });
+  };
+
+  const updateCityPanels = (ranking) => {
+    renderCityRows(cityList, ranking);
+    cityTotal.textContent = formatNumber(ranking.length);
+    renderCityRows(topCityList, ranking, { limit: 5, withBars: true });
+  };
+
   const renderSiteAnalytics = (site, events, visitors, notifyNewVisitors) => {
     const pageViews = events.filter((event) => event.event_type === "page_view");
     const sessionCounts = new Map();
@@ -371,6 +453,8 @@
       visitorTotal,
     );
     sourceBreakdown = [...domainCounts.entries()].sort((a, b) => b[1] - a[1]);
+
+    updateCityPanels(aggregateCityRanking(pageViews));
 
     const pageGroups = new Map();
     pageViews.forEach((event) => {
@@ -458,12 +542,7 @@
       const elapsed = Math.max(0, Math.floor((Date.now() - Date.parse(visitor.started_at)) / 1000));
       duration.append(dot, document.createTextNode(` ${Math.floor(elapsed / 60)}m ${String(elapsed % 60).padStart(2, "0")}s`));
       durationCell.append(duration);
-      const providerCell = document.createElement("td");
-      const provider = document.createElement("span");
-      provider.className = "provider";
-      provider.textContent = visitor.provider || "—";
-      providerCell.append(provider);
-      row.append(location, page, durationCell, providerCell);
+      row.append(location, page, durationCell);
       visitorRows.append(row);
     });
 
@@ -482,6 +561,7 @@
     }
     notice.querySelector(".notice-link").hidden = !site.verified_at;
     notice.querySelector(".notice-link").textContent = "Ver snippet";
+    markUpdatedAt();
   };
 
   const loadSiteAnalytics = async (site, { notifyNewVisitors = false } = {}) => {
@@ -490,7 +570,7 @@
     if (!session) return;
     const periodMs = Number(document.getElementById("date-range").value) * 24 * 60 * 60 * 1000;
     const eventParams = new URLSearchParams({
-      select: "event_type,visitor_session_id,page_path,occurred_at,page_duration_seconds,referrer_domain",
+      select: "event_type,visitor_session_id,page_path,occurred_at,page_duration_seconds,referrer_domain,city,country_code",
       site_id: `eq.${site.id}`,
       occurred_at: `gte.${new Date(Date.now() - periodMs).toISOString()}`,
       order: "occurred_at.desc",
@@ -617,6 +697,7 @@
     const bounce = document.getElementById("metric-bounce");
     if (bounce) bounce.innerHTML = `${metrics.bounce}<span class="value-unit">%</span>`;
     setText("source-total", formatNumber(metrics.visitors));
+    updateCityPanels(DEMO_CITIES);
     renderSourceRows([
       ["Google (busca)", metrics.sources[0], "bar-purple"],
       ["Acesso direto", metrics.sources[1], "bar-blue"],
@@ -668,18 +749,26 @@
       const dot = document.createElement("i");
       durationLabel.append(dot, document.createTextNode(` ${visitor.duration}`));
       duration.append(durationLabel);
-
-      const provider = document.createElement("td");
-      const providerLabel = document.createElement("span");
-      providerLabel.className = "provider";
-      providerLabel.textContent = visitor.provider;
-      provider.append(providerLabel);
-      row.append(location, page, duration, provider);
+      row.append(location, page, duration);
       visitorRows.append(row);
     });
   };
 
+  const ALERT_TONES = {
+    classico: ["sine", 740, 990],
+    suave: ["sine", 520, 660],
+    urgente: ["square", 620, 930],
+    sino: ["triangle", 880, 1320],
+  };
+  const markUpdatedAt = () => {
+    const updated = document.getElementById("updated-at");
+    if (!updated) return;
+    const time = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    updated.textContent = `Atualizado às ${time}`;
+  };
+
   const playAlert = async () => {
+    const tone = ALERT_TONES[alertTone] || ALERT_TONES.classico;
     try {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) {
@@ -690,11 +779,11 @@
       if (audioContext.state === "suspended") await audioContext.resume();
       const oscillator = audioContext.createOscillator();
       const gain = audioContext.createGain();
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(740, audioContext.currentTime);
-      oscillator.frequency.setValueAtTime(990, audioContext.currentTime + 0.13);
+      oscillator.type = tone[0];
+      oscillator.frequency.setValueAtTime(tone[1], audioContext.currentTime);
+      oscillator.frequency.setValueAtTime(tone[2], audioContext.currentTime + (tone[0] === "square" ? 0.09 : 0.13));
       gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.12, audioContext.currentTime + 0.025);
+      gain.gain.exponentialRampToValueAtTime(tone[0] === "square" ? 0.07 : 0.12, audioContext.currentTime + 0.025);
       gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.32);
       oscillator.connect(gain);
       gain.connect(audioContext.destination);
@@ -780,6 +869,8 @@
   restoreTheme();
   renderVisitors();
   updateRange("7");
+  updateCityPanels(DEMO_CITIES);
+  markUpdatedAt();
   try {
     const storedSession = sessionStorage.getItem("vigia-session");
     if (storedSession) authSession = JSON.parse(storedSession);
@@ -803,9 +894,20 @@
 
   try {
     soundEnabled = window.localStorage.getItem("vigia-alert-sound") === "on";
+    alertTone = window.localStorage.getItem("vigia-alert-tone") || "classico";
   } catch {
     soundEnabled = false;
+    alertTone = "classico";
   }
+  const soundToneSelect = document.getElementById("sound-tone");
+  if (!ALERT_TONES[alertTone]) alertTone = "classico";
+  soundToneSelect.value = alertTone;
+  soundToneSelect.addEventListener("change", () => {
+    alertTone = soundToneSelect.value;
+    persist("vigia-alert-tone", alertTone);
+    void playAlert();
+    showToast("Toque atualizado", `Prévia do toque “${soundToneSelect.options[soundToneSelect.selectedIndex].text}”.`);
+  });
   const setSoundEnabled = (enabled) => {
     soundToggle.setAttribute("aria-pressed", String(enabled));
     soundStatus.textContent = enabled ? "Ativado" : "Desativado";
@@ -1129,7 +1231,28 @@
     if (site) {
       void loadSiteAnalytics(site, { notifyNewVisitors: true });
     } else {
-      showToast("Dados de demonstração", "A lista não se conecta a visitantes reais neste protótipo.", true);
+      markUpdatedAt();
+      showToast("Dados atualizados", "Modo demonstração em exibição; entre com um site para recarregar métricas reais.", true);
+    }
+  });
+
+  document.getElementById("refresh-data").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.classList.add("is-refreshing");
+    try {
+      await Promise.resolve();
+      const site = userSites.find((item) => item.id === activeSiteId);
+      if (site) {
+        await loadSiteAnalytics(site, { notifyNewVisitors: true });
+        showToast("Painel atualizado", "Métricas recarregadas agora.");
+      } else {
+        markUpdatedAt();
+        showToast("Painel atualizado", "Modo demonstração em exibição; não há site conectado.", true);
+      }
+    } finally {
+      button.disabled = false;
+      button.classList.remove("is-refreshing");
     }
   });
   document.getElementById("show-sources").addEventListener("click", () => {

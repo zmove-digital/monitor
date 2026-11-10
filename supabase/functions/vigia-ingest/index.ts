@@ -44,6 +44,52 @@ const isAllowedReferrer = (value) => typeof value === "string"
   && value.length <= 253
   && /^[a-z0-9.-]+$/i.test(value);
 
+// City enrichment uses the request IP only for a momentary lookup. The IP itself is
+// never persisted, logged by this code or exposed; only the coarse city/country is kept.
+const geoCache = new Map();
+const GEO_CACHE_TTL = 24 * 60 * 60 * 1000;
+const GEO_CACHE_LIMIT = 8192;
+
+const getClientIp = (request) => {
+  const forwarded = request.headers.get("x-forwarded-for");
+  const ip = request.headers.get("cf-connecting-ip")
+    || request.headers.get("x-real-ip")
+    || (forwarded ? forwarded.split(",")[0].trim() : "");
+  if (!ip || ip === "::1" || ip.startsWith("127.") || ip.startsWith("192.168.")
+    || ip.startsWith("10.") || ip.startsWith("172.16.") || ip.startsWith("fc") || ip.startsWith("fd")) {
+    return null;
+  }
+  return ip;
+};
+
+const lookupGeo = async (ip) => {
+  if (!ip) return null;
+  const now = Date.now();
+  const cached = geoCache.get(ip);
+  if (cached && now - cached.ts < GEO_CACHE_TTL) return cached;
+  try {
+    const response = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!response.ok) throw new Error(`geo HTTP ${response.status}`);
+    const data = await response.json();
+    const city = typeof data?.city === "string" && data.city.length >= 1 && data.city.length <= 120
+      ? data.city
+      : null;
+    const countryCode = typeof data?.country_code === "string" && /^[A-Z]{2}$/.test(data.country_code)
+      ? data.country_code
+      : null;
+    if (!city && !countryCode) return null;
+    if (geoCache.size >= GEO_CACHE_LIMIT) geoCache.clear();
+    const entry = { city, countryCode, ts: now };
+    geoCache.set(ip, entry);
+    return entry;
+  } catch (error) {
+    console.warn("Vigia geo lookup skipped:", error.message);
+    return null;
+  }
+};
+
 Deno.serve(async (request) => {
   const origin = request.headers.get("origin") || "";
   if (request.method === "OPTIONS") {
@@ -81,6 +127,10 @@ Deno.serve(async (request) => {
       ? body.referrer_domain.toLowerCase()
       : null;
 
+    // Only the coarse city/country survives; the raw IP never reaches the database.
+    const geo = await lookupGeo(getClientIp(request));
+    const geoFields = geo ? { country_code: geo.countryCode, city: geo.city } : {};
+
     if (eventType === "page_view" || eventType === "page_exit") {
       const duration = Number.isInteger(body.page_duration_seconds)
         ? Math.min(86400, Math.max(0, body.page_duration_seconds))
@@ -95,6 +145,7 @@ Deno.serve(async (request) => {
           occurred_at: now,
           ...(eventType === "page_exit" && duration !== null ? { page_duration_seconds: duration } : {}),
           ...(eventType === "page_view" && referrer ? { referrer_domain: referrer } : {}),
+          ...geoFields,
         },
       });
     }
@@ -115,6 +166,7 @@ Deno.serve(async (request) => {
           page_path: pagePath,
           last_seen_at: now,
           expires_at: new Date(Date.now() + 90_000).toISOString(),
+          ...geoFields,
         },
       });
     }
