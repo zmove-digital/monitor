@@ -219,6 +219,8 @@
       domain.textContent = userSites.length ? `${userSites.length} site(s) na conta` : "Nenhum site conectado";
       breadcrumbSite.textContent = userSites.length ? "Selecione um site" : "Visão geral";
       topbarSite.hidden = true;
+      // Demo warning belongs only to the state without a monitored site.
+      document.querySelector(".demo-notice").hidden = userSites.length > 0;
       renderSiteMenu();
       return;
     }
@@ -570,19 +572,9 @@
 
     document.querySelector(".chart").classList.toggle("no-data", pageViews.length === 0);
     renderTrend(events, document.getElementById("date-range").value);
-    const notice = document.querySelector(".demo-notice");
-    notice.hidden = false;
-    const noticeMessage = notice.querySelector("p");
-    if (!site.verified_at) {
-      noticeMessage.textContent = "Site registrado, mas ainda não verificado. A ingestão só poderá ser ativada após confirmar o domínio.";
-    } else if (pageViews.length > 0) {
-      const days = document.getElementById("date-range").value;
-      noticeMessage.textContent = `Coleta ativa: ${formatNumber(pageViews.length)} visualização(ões) registrada(s) nos últimos ${days} dias.`;
-    } else {
-      noticeMessage.textContent = "Domínio verificado. Ainda não recebemos visitas neste período. Confirme se o snippet está publicado e abra uma página do site para testar.";
-    }
-    notice.querySelector(".notice-link").hidden = !site.verified_at;
-    notice.querySelector(".notice-link").textContent = "Ver snippet";
+    // Real data is on screen whenever a site is connected; the demo warning is
+    // only meant for the signed-out / no-site state.
+    document.querySelector(".demo-notice").hidden = true;
     markUpdatedAt();
   };
 
