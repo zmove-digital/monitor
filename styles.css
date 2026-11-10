@@ -44,6 +44,15 @@ a { color: inherit; text-decoration: none; }
 .privacy-card a { color: var(--purple); font-size: 10px; font-weight: 700; }
 .profile-button { display: flex; align-items: center; gap: 9px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); text-align: left; cursor: pointer; }
 .avatar { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 50%; color: #8059c7; background: #efe7ff; font-weight: 700; }
+.avatar-eye { display: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; transform-origin: center; }
+.avatar.monitoring { color: #5b52e6; background: #e7e4ff; }
+.avatar.monitoring .avatar-initial { display: none; }
+.avatar.monitoring .avatar-eye { display: block; animation: avatar-blink 3.8s ease-in-out infinite; }
+@keyframes avatar-blink {
+  0%, 86%, 100% { transform: scaleY(1); }
+  90% { transform: scaleY(.08); }
+  94% { transform: scaleY(1); }
+}
 .profile-button span:nth-child(2) { display: flex; flex: 1; flex-direction: column; gap: 2px; }
 .profile-button strong { color: var(--text-strong); font-size: 10px; }.profile-button small { color: var(--muted); font-size: 9px; }
 .more-icon { width: 18px; height: 18px; fill: var(--muted); }
@@ -197,6 +206,7 @@ body.dark .challenge-notice { color: #d7c58d; border-color: #49412d; background:
 
 body.dark .city-row { border-color: #292d3e; }body.dark .city-flag { background: #262a3b; }
 body.dark .topbar-site { border-color: #34384c; }
+body.dark .avatar.monitoring { color: #c3bdff; background: #302e50; }
 @media (max-width: 520px) {
   .topbar-site { max-width: 132px; padding: 4px 8px; font-size: 8px; }
 }

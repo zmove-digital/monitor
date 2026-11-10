@@ -214,6 +214,12 @@
     const domain = document.getElementById("active-site-domain");
     const breadcrumbSite = document.getElementById("breadcrumb-site");
     const topbarSite = document.getElementById("topbar-site");
+    const profileAvatar = document.getElementById("profile-avatar");
+    const profileButton = document.querySelector(".profile-button");
+    // The avatar turns into a blinking eye while a site is being monitored.
+    profileAvatar.classList.toggle("monitoring", Boolean(activeSite));
+    profileButton.title = activeSite ? `Monitorando ${activeSite.domain}` : "Perfil da conta";
+    profileButton.setAttribute("aria-label", activeSite ? `Perfil da conta — monitorando ${activeSite.domain}` : "Perfil da conta");
     // Single source of truth for the demo warning: it is only meaningful when the
     // account has no connected site. Any connected site (selected or not) hides it,
     // regardless of whether analytics finished loading.
