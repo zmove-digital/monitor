@@ -24,11 +24,6 @@
   const modalIntro = document.getElementById("modal-intro");
   const modalProgress = document.getElementById("modal-progress");
   const modalStepLabel = document.getElementById("modal-step-label");
-  const demoVisitors = [
-    { flag: "🇧🇷", city: "São Paulo", country: "Brasil", page: "/produtos/novidades", duration: "1m 24s", provider: "Vivo" },
-    { flag: "🇧🇷", city: "Curitiba", country: "Brasil", page: "/colecao/verao", duration: "48s", provider: "Claro" },
-    { flag: "🇵🇹", city: "Lisboa", country: "Portugal", page: "/sobre-nos", duration: "3m 06s", provider: "MEO" },
-  ];
   let audioContext;
   const supabase = window.VIGIA_SUPABASE;
   let authMode = "login";
@@ -41,15 +36,6 @@
   let knownVisitorIds = new Set();
   let soundEnabled = false;
   let alertTone = "classico";
-  const DEMO_CITIES = [
-    { city: "Campinas", country: "BR", visitors: 614 },
-    { city: "Valinhos", country: "BR", visitors: 187 },
-    { city: "Vinhedo", country: "BR", visitors: 121 },
-    { city: "São Paulo", country: "BR", visitors: 106 },
-    { city: "Sumaré", country: "BR", visitors: 88 },
-    { city: "Jundiaí", country: "BR", visitors: 71 },
-    { city: "Limeira", country: "BR", visitors: 55 },
-  ];
   let sourceBreakdown = [];
   let recoverySession = null;
 
@@ -281,6 +267,8 @@
     document.querySelector(".area-path").setAttribute("d", `${visitorPath} L720 200 L0 200Z`);
     const visitorLastY = 190 - (bins[6].sessions.size / scaleMax) * 180;
     const point = document.querySelector(".chart-point");
+    point.setAttribute("cx", "720");
+    point.setAttribute("r", "4.5");
     point.setAttribute("cy", visitorLastY.toFixed(1));
     const tickSpans = document.querySelectorAll(".y-axis span");
     tickSpans.forEach((span, index) => {
@@ -389,13 +377,13 @@
       .sort((a, b) => b.visitors - a.visitors || a.city.localeCompare(b.city, "pt-BR"));
   };
 
-  const renderCityRows = (container, ranking, { limit = Number.MAX_SAFE_INTEGER, withBars = false } = {}) => {
+  const renderCityRows = (container, ranking, { limit = Number.MAX_SAFE_INTEGER, withBars = false, emptyMessage = "Por enquanto, nenhuma cidade foi identificada para o site neste período." } = {}) => {
     container.replaceChildren();
     const slice = ranking.slice(0, limit);
     if (!slice.length) {
       const empty = document.createElement("p");
       empty.className = "empty-data-message";
-      empty.textContent = "Por enquanto, nenhuma cidade foi identificada para o site neste período.";
+      empty.textContent = emptyMessage;
       container.append(empty);
       return;
     }
@@ -434,10 +422,10 @@
     });
   };
 
-  const updateCityPanels = (ranking) => {
-    renderCityRows(cityList, ranking);
+  const updateCityPanels = (ranking, emptyMessage) => {
+    renderCityRows(cityList, ranking, { emptyMessage });
     cityTotal.textContent = formatNumber(ranking.length);
-    renderCityRows(topCityList, ranking, { limit: 5, withBars: true });
+    renderCityRows(topCityList, ranking, { limit: 5, withBars: true, emptyMessage });
   };
 
   const renderSiteAnalytics = (site, events, visitors, notifyNewVisitors) => {
@@ -626,6 +614,7 @@
       userSites = [];
       activeSiteId = null;
       updateSitePicker();
+      renderBlankDashboard();
       return;
     }
     const user = await supabaseRequest("/auth/v1/user", { accessToken: session.access_token });
@@ -705,78 +694,41 @@
     return true;
   };
 
-  const updateRange = (days) => {
-    const metrics = {
-      7: { visitors: 2847, views: 6391, time: "2m 34s", bounce: "38,6", sources: [1196, 797, 569, 285], pages: ["1.284", "967", "742", "531"] },
-      30: { visitors: 11629, views: 28214, time: "2m 41s", bounce: "36,2", sources: [4890, 3280, 2332, 1127], pages: ["5.200", "4.100", "3.420", "2.500"] },
-      90: { visitors: 34915, views: 83502, time: "2m 29s", bounce: "39,1", sources: [14664, 9776, 6983, 3492], pages: ["15.500", "13.000", "11.200", "8.800"] },
-    }[days];
-    if (!metrics) return;
+  const renderBlankDashboard = () => {
     const setText = (id, value) => {
       const element = document.getElementById(id);
       if (element) element.textContent = value;
     };
-    setText("metric-visitors", formatNumber(metrics.visitors));
-    setText("metric-views", formatNumber(metrics.views));
-    setText("metric-time", metrics.time);
+    setText("live-visitors", "0");
+    setText("nav-live-count", "0");
+    setText("metric-visitors", "—");
+    setText("metric-views", "—");
+    setText("metric-time", "—");
     const bounce = document.getElementById("metric-bounce");
-    if (bounce) bounce.innerHTML = `${metrics.bounce}<span class="value-unit">%</span>`;
-    setText("source-total", formatNumber(metrics.visitors));
-    updateCityPanels(DEMO_CITIES);
-    renderSourceRows([
-      ["Google (busca)", metrics.sources[0], "bar-purple"],
-      ["Acesso direto", metrics.sources[1], "bar-blue"],
-      ["Redes sociais", metrics.sources[2], "bar-pink"],
-      ["Outros sites", metrics.sources[3], "bar-green"],
-    ], metrics.visitors);
+    if (bounce) bounce.innerHTML = "—";
+    setText("source-total", "—");
+    document.querySelectorAll(".metric-card .change").forEach((chip) => { chip.textContent = ""; });
+    updateCityPanels([], "Entre na sua conta para acompanhar as cidades dos visitantes.");
+    renderSourceRows([], 0);
     sourceBreakdown = [];
-    metrics.pages.forEach((value, index) => setText(`popular-page-${index + 1}`, value));
-    const labels = document.getElementById("chart-labels");
-    labels.replaceChildren();
-    const today = new Date();
-    for (let index = 6; index >= 0; index -= 1) {
-      const date = new Date(today);
-      const daysAgo = Math.round(index * (Number(days) - 1) / 6);
-      date.setDate(today.getDate() - daysAgo);
-      const label = document.createElement("span");
-      label.textContent = date.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit" }).replace(".", "");
-      labels.append(label);
+    const pageList = document.querySelector(".page-list");
+    if (pageList) {
+      pageList.replaceChildren();
+      const empty = document.createElement("p");
+      empty.className = "empty-data-message";
+      empty.textContent = "Entre na sua conta para ver as páginas mais acessadas.";
+      pageList.append(empty);
     }
-    document.querySelector(".chart-wrap").setAttribute("aria-label", `Gráfico de exemplo com visitantes e visualizações nos últimos ${days} dias`);
-  };
-
-  const renderVisitors = () => {
-    visitorRows.replaceChildren();
-    demoVisitors.forEach((visitor) => {
-      const row = document.createElement("tr");
-      const location = document.createElement("td");
-      const flag = document.createElement("span");
-      flag.className = "country-flag";
-      flag.textContent = visitor.flag;
-      const locationLabel = document.createElement("span");
-      locationLabel.className = "visitor-location";
-      const city = document.createElement("strong");
-      city.textContent = visitor.city;
-      const country = document.createElement("small");
-      country.textContent = visitor.country;
-      locationLabel.append(city, country);
-      location.append(flag, locationLabel);
-
-      const page = document.createElement("td");
-      const path = document.createElement("span");
-      path.className = "page-path";
-      path.textContent = visitor.page;
-      page.append(path);
-
-      const duration = document.createElement("td");
-      const durationLabel = document.createElement("span");
-      durationLabel.className = "duration";
-      const dot = document.createElement("i");
-      durationLabel.append(dot, document.createTextNode(` ${visitor.duration}`));
-      duration.append(durationLabel);
-      row.append(location, page, duration);
-      visitorRows.append(row);
-    });
+    const labels = document.getElementById("chart-labels");
+    if (labels) labels.replaceChildren();
+    const chart = document.querySelector(".chart");
+    if (chart) chart.classList.add("no-data");
+    document.querySelector(".chart-wrap")?.setAttribute("aria-label", "Gráfico sem dados");
+    document.querySelector(".line-visitors")?.setAttribute("d", "");
+    document.querySelector(".line-views")?.setAttribute("d", "");
+    document.querySelector(".area-path")?.setAttribute("d", "");
+    document.querySelector(".chart-point")?.setAttribute("r", "0");
+    renderEmptyVisitors("Entre na sua conta para ver os visitantes em tempo real.");
   };
 
   const ALERT_TONES = {
@@ -899,9 +851,7 @@
   };
 
   restoreTheme();
-  renderVisitors();
-  updateRange("7");
-  updateCityPanels(DEMO_CITIES);
+  renderBlankDashboard();
   markUpdatedAt();
   updateGreeting();
   try {
@@ -1067,7 +1017,7 @@
       if (site) await loadSiteAnalytics(site);
       return;
     }
-    updateRange(event.target.value);
+    renderBlankDashboard();
   });
   document.getElementById("add-site-button").addEventListener("click", openModal);
   document.getElementById("notice-add-site").addEventListener("click", () => {
@@ -1244,11 +1194,9 @@
       siteMenu.hidden = true;
       setAuthenticatedUi(null);
       updateSitePicker();
-      renderVisitors();
-      updateRange(document.getElementById("date-range").value);
-      document.querySelector(".chart").classList.remove("no-data");
+      renderBlankDashboard();
       document.querySelector(".demo-notice").hidden = false;
-      document.querySelector(".demo-notice p").innerHTML = "<strong>Você está vendo dados de demonstração.</strong> Nenhuma visita real está sendo coletada. Conecte seu site para ativar métricas reais.";
+      document.querySelector(".demo-notice p").innerHTML = "<strong>Nenhum site conectado.</strong> Entre na sua conta e adicione um site para acompanhar métricas reais em tempo real.";
       document.querySelector(".notice-link").hidden = false;
       showToast("Sessão encerrada", "Sua conta foi desconectada deste navegador.");
     }
@@ -1380,7 +1328,7 @@
       void loadSiteAnalytics(site, { notifyNewVisitors: true });
     } else {
       markUpdatedAt();
-      showToast("Dados atualizados", "Modo demonstração em exibição; entre com um site para recarregar métricas reais.", true);
+      showToast("Dados atualizados", "Entre com um site para carregar métricas reais.", true);
     }
   });
 
@@ -1396,7 +1344,7 @@
         showToast("Painel atualizado", "Métricas recarregadas agora.");
       } else {
         markUpdatedAt();
-        showToast("Painel atualizado", "Modo demonstração em exibição; não há site conectado.", true);
+        showToast("Painel atualizado", "Entre com um site para carregar métricas reais.", true);
       }
     } finally {
       button.disabled = false;
@@ -1411,7 +1359,7 @@
     sourcePopoverList.replaceChildren();
     if (!sourceBreakdown.length) {
       sourcePopoverList.hidden = true;
-      sourcePopoverNote.textContent = "Os canais exibidos são exemplos e não vêm de uma fonte de analytics. Conecte um site verificado para ver as origens reais.";
+      sourcePopoverNote.textContent = "Entre na sua conta com um site verificado para ver as origens reais de tráfego.";
     } else {
       sourcePopoverList.hidden = false;
       const total = sourceBreakdown.reduce((sum, [, count]) => sum + count, 0);
@@ -1439,7 +1387,7 @@
     }
     sourcePopover.hidden = false;
   });
-  document.getElementById("show-pages").addEventListener("click", () => showToast("Páginas populares", "As páginas e tempos exibidos são dados de demonstração."));
+  document.getElementById("show-pages").addEventListener("click", () => showToast("Páginas populares", "Entre com um site para ver as páginas mais acessadas."));
 
   window.setInterval(() => {
     if (!authSession || !activeSiteId) return;
