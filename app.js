@@ -428,15 +428,6 @@
     renderCityRows(topCityList, ranking, { limit: 5, withBars: true, emptyMessage });
   };
 
-  const relativeTime = (timestamp) => {
-    const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60_000));
-    if (minutes < 1) return "agora";
-    if (minutes < 60) return `há ${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `há ${hours} h`;
-    return `há ${Math.floor(hours / 24)} d`;
-  };
-
   // One row per city, using its most recent page view, sorted by recency.
   const renderRecentCities = (events, emptyMessage = "Nenhuma cidade foi registrada neste período.") => {
     const container = document.getElementById("recent-cities-list");
@@ -449,7 +440,7 @@
       const key = `${event.city.toLowerCase()}|${(event.country_code || "").toLowerCase()}`;
       const previous = latestByCity.get(key);
       if (!previous || time > previous.time) {
-        latestByCity.set(key, { city: event.city, country: event.country_code, time });
+        latestByCity.set(key, { city: event.city, country: event.country_code, time, page: event.page_path || "" });
       }
     });
     const recent = [...latestByCity.values()].sort((a, b) => b.time - a.time).slice(0, 5);
@@ -477,8 +468,13 @@
       const stats = document.createElement("div");
       stats.className = "city-stats";
       const when = document.createElement("strong");
-      when.textContent = relativeTime(item.time);
-      stats.append(when);
+      when.textContent = new Date(item.time).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      when.title = new Date(item.time).toLocaleString("pt-BR");
+      const page = document.createElement("small");
+      page.className = "recent-city-page";
+      page.textContent = item.page || "—";
+      page.title = item.page || "";
+      stats.append(when, page);
       row.append(rank, info, stats);
       container.append(row);
     });
