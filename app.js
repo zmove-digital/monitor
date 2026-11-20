@@ -194,8 +194,35 @@
     siteMenu.append(addButton);
   };
 
+  // Show the monitored site's own icon in the switcher; fall back to its initial
+  // if the favicon service cannot find one.
+  const updateSiteFavicon = (site) => {
+    const favicon = document.getElementById("site-favicon");
+    favicon.replaceChildren();
+    favicon.classList.remove("has-image");
+    favicon.removeAttribute("title");
+    if (!site) {
+      favicon.textContent = "L";
+      return;
+    }
+    const initial = site.domain.charAt(0).toUpperCase();
+    favicon.title = site.domain;
+    const image = document.createElement("img");
+    image.alt = "";
+    image.decoding = "async";
+    image.src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(site.domain)}&sz=64`;
+    image.addEventListener("load", () => favicon.classList.add("has-image"));
+    image.addEventListener("error", () => {
+      favicon.replaceChildren();
+      favicon.classList.remove("has-image");
+      favicon.textContent = initial;
+    });
+    favicon.append(image);
+  };
+
   const updateSitePicker = () => {
     const activeSite = userSites.find((site) => site.id === activeSiteId);
+    updateSiteFavicon(activeSite);
     const name = document.getElementById("active-site-name");
     const domain = document.getElementById("active-site-domain");
     const breadcrumbSite = document.getElementById("breadcrumb-site");
