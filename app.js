@@ -428,6 +428,62 @@
     renderCityRows(topCityList, ranking, { limit: 5, withBars: true, emptyMessage });
   };
 
+  const relativeTime = (timestamp) => {
+    const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60_000));
+    if (minutes < 1) return "agora";
+    if (minutes < 60) return `há ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `há ${hours} h`;
+    return `há ${Math.floor(hours / 24)} d`;
+  };
+
+  // One row per city, using its most recent page view, sorted by recency.
+  const renderRecentCities = (events, emptyMessage = "Nenhuma cidade foi registrada neste período.") => {
+    const container = document.getElementById("recent-cities-list");
+    if (!container) return;
+    const latestByCity = new Map();
+    events.forEach((event) => {
+      if (event.event_type !== "page_view" || !event.city) return;
+      const time = Date.parse(event.occurred_at);
+      if (!Number.isFinite(time)) return;
+      const key = `${event.city.toLowerCase()}|${(event.country_code || "").toLowerCase()}`;
+      const previous = latestByCity.get(key);
+      if (!previous || time > previous.time) {
+        latestByCity.set(key, { city: event.city, country: event.country_code, time });
+      }
+    });
+    const recent = [...latestByCity.values()].sort((a, b) => b.time - a.time).slice(0, 5);
+    container.replaceChildren();
+    if (!recent.length) {
+      const empty = document.createElement("p");
+      empty.className = "empty-data-message";
+      empty.textContent = emptyMessage;
+      container.append(empty);
+      return;
+    }
+    recent.forEach((item, index) => {
+      const row = document.createElement("div");
+      row.className = "city-row";
+      const rank = document.createElement("span");
+      rank.className = "city-rank";
+      rank.textContent = String(index + 1).padStart(2, "0");
+      const info = document.createElement("div");
+      info.className = "city-info";
+      const name = document.createElement("strong");
+      name.textContent = item.city;
+      const detail = document.createElement("small");
+      detail.textContent = item.country ? `${flagForCountry(item.country)} ${item.country}` : "País não identificado";
+      info.append(name, detail);
+      const stats = document.createElement("div");
+      stats.className = "city-stats";
+      const when = document.createElement("strong");
+      when.textContent = relativeTime(item.time);
+      stats.append(when);
+      row.append(rank, info, stats);
+      container.append(row);
+    });
+  };
+
   const renderSiteAnalytics = (site, events, visitors, notifyNewVisitors) => {
     // Supabase errors or empty responses must never crash the render pipeline.
     events = Array.isArray(events) ? events : [];
@@ -478,6 +534,7 @@
     sourceBreakdown = [...domainCounts.entries()].sort((a, b) => b[1] - a[1]);
 
     updateCityPanels(aggregateCityRanking(pageViews));
+    renderRecentCities(events);
 
     const pageGroups = new Map();
     pageViews.forEach((event) => {
@@ -709,6 +766,7 @@
     setText("source-total", "—");
     document.querySelectorAll(".metric-card .change").forEach((chip) => { chip.textContent = ""; });
     updateCityPanels([], "Entre na sua conta para acompanhar as cidades dos visitantes.");
+    renderRecentCities([], "Entre na sua conta para ver as últimas cidades que acessaram o site.");
     renderSourceRows([], 0);
     sourceBreakdown = [];
     const pageList = document.querySelector(".page-list");
