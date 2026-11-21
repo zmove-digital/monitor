@@ -1081,6 +1081,20 @@
           if (site) void loadSiteAnalytics(site, { notifyNewVisitors: true });
         });
       }
+      // Android notification channels are immutable once created. Call this on
+      // every setup so the custom three-beep sound stays attached to the channel.
+      try {
+        await pushPlugin.createChannel({
+          id: "vigia-triplo",
+          name: "Novas visitas",
+          description: "Três bipes agudos quando alguém acessa seu site",
+          sound: "vigia_triplo.wav",
+          importance: 4,
+          vibration: true,
+        });
+      } catch {
+        // Devices without channel support simply keep the default sound.
+      }
       await pushPlugin.register();
     } catch (error) {
       setPushUi(false);

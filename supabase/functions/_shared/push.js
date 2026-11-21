@@ -116,7 +116,17 @@ export const sendPushToUsers = async (userIds, { title, body, data = {} }) => {
             message: {
               token,
               notification: { title, body },
-              android: { priority: "high" },
+              android: {
+                priority: "high",
+                notification: {
+                  title,
+                  body,
+                  channel_id: "vigia-triplo",
+                  sound: "vigia_triplo",
+                  notification_priority: "PRIORITY_HIGH",
+                  visibility: "PUBLIC",
+                },
+              },
               data: Object.fromEntries(Object.entries(data).map(([key, value]) => [key, String(value)])),
             },
           }),
