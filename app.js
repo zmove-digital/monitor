@@ -459,6 +459,12 @@
   const renderRecentCities = (events, emptyMessage = "Nenhuma cidade foi registrada neste período.") => {
     const container = document.getElementById("recent-cities-list");
     if (!container) return;
+    const sessionDurations = new Map();
+    events.forEach((event) => {
+      if (event.event_type !== "page_exit" || event.page_duration_seconds == null) return;
+      const id = event.visitor_session_id;
+      sessionDurations.set(id, (sessionDurations.get(id) || 0) + Number(event.page_duration_seconds));
+    });
     const latestByCity = new Map();
     events.forEach((event) => {
       if (event.event_type !== "page_view" || !event.city) return;
@@ -467,7 +473,13 @@
       const key = `${event.city.toLowerCase()}|${(event.country_code || "").toLowerCase()}`;
       const previous = latestByCity.get(key);
       if (!previous || time > previous.time) {
-        latestByCity.set(key, { city: event.city, country: event.country_code, time, page: event.page_path || "" });
+        latestByCity.set(key, {
+          city: event.city,
+          country: event.country_code,
+          time,
+          page: event.page_path || "",
+          duration: sessionDurations.get(event.visitor_session_id) || 0,
+        });
       }
     });
     const recent = [...latestByCity.values()].sort((a, b) => b.time - a.time).slice(0, 5);
@@ -494,14 +506,22 @@
       info.append(name, detail);
       const stats = document.createElement("div");
       stats.className = "city-stats";
+      const whenRow = document.createElement("div");
+      whenRow.className = "recent-city-when";
       const when = document.createElement("strong");
       when.textContent = new Date(item.time).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
       when.title = new Date(item.time).toLocaleString("pt-BR");
+      const seconds = Math.max(0, Math.round(item.duration));
+      const duration = document.createElement("span");
+      duration.className = "recent-city-duration";
+      duration.textContent = ` · ${seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`}`;
+      duration.title = "Tempo que o visitante ficou no site";
+      whenRow.append(when, duration);
       const page = document.createElement("small");
       page.className = "recent-city-page";
       page.textContent = item.page || "—";
       page.title = item.page || "";
-      stats.append(when, page);
+      stats.append(whenRow, page);
       row.append(rank, info, stats);
       container.append(row);
     });
