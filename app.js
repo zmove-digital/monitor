@@ -839,6 +839,7 @@
     suave: ["sine", 520, 660],
     urgente: ["square", 620, 930],
     sino: ["triangle", 880, 1320],
+    triplo: ["sine", 2600, 2600, { beeps: 3, interval: 0.24, duration: 0.12, attack: 0.008, level: 0.5 }],
   };
   const markUpdatedAt = () => {
     const updated = document.getElementById("updated-at");
@@ -864,18 +865,28 @@
       }
       audioContext ||= new AudioContextClass();
       if (audioContext.state === "suspended") await audioContext.resume();
-      const oscillator = audioContext.createOscillator();
-      const gain = audioContext.createGain();
-      oscillator.type = tone[0];
-      oscillator.frequency.setValueAtTime(tone[1], audioContext.currentTime);
-      oscillator.frequency.setValueAtTime(tone[2], audioContext.currentTime + (tone[0] === "square" ? 0.09 : 0.13));
-      gain.gain.setValueAtTime(0.0001, audioContext.currentTime);
-      gain.gain.exponentialRampToValueAtTime(tone[0] === "square" ? 0.07 : 0.12, audioContext.currentTime + 0.025);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.32);
-      oscillator.connect(gain);
-      gain.connect(audioContext.destination);
-      oscillator.start();
-      oscillator.stop(audioContext.currentTime + 0.34);
+      const [, startFrequency, endFrequency, pattern] = tone;
+      const beeps = pattern?.beeps || 1;
+      const interval = pattern?.interval || 0;
+      const duration = pattern?.duration || 0.32;
+      const attack = pattern?.attack || 0.025;
+      const level = pattern?.level || (tone[0] === "square" ? 0.07 : 0.12);
+      const now = audioContext.currentTime;
+      for (let index = 0; index < beeps; index += 1) {
+        const at = now + index * interval;
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        oscillator.type = tone[0];
+        oscillator.frequency.setValueAtTime(startFrequency, at);
+        oscillator.frequency.setValueAtTime(endFrequency, at + Math.min(0.13, duration / 2));
+        gain.gain.setValueAtTime(0.0001, at);
+        gain.gain.exponentialRampToValueAtTime(level, at + attack);
+        gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+        oscillator.connect(gain);
+        gain.connect(audioContext.destination);
+        oscillator.start(at);
+        oscillator.stop(at + duration + 0.02);
+      }
       return true;
     } catch {
       showToast("Não foi possível tocar o alerta", "Verifique se o navegador permite reprodução de áudio.", true);
