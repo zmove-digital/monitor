@@ -478,7 +478,7 @@
           country: event.country_code,
           time,
           page: event.page_path || "",
-          duration: sessionDurations.get(event.visitor_session_id) || 0,
+          duration: sessionDurations.has(event.visitor_session_id) ? sessionDurations.get(event.visitor_session_id) : null,
         });
       }
     });
@@ -511,10 +511,12 @@
       const when = document.createElement("strong");
       when.textContent = new Date(item.time).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
       when.title = new Date(item.time).toLocaleString("pt-BR");
-      const seconds = Math.max(0, Math.round(item.duration));
+      const seconds = Math.max(0, Math.round(item.duration || 0));
       const duration = document.createElement("span");
       duration.className = "recent-city-duration";
-      duration.textContent = ` · ${seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`}`;
+      duration.textContent = item.duration == null
+        ? " · —"
+        : ` · ${seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`}`;
       duration.title = "Tempo que o visitante ficou no site";
       whenRow.append(when, duration);
       const page = document.createElement("small");
