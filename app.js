@@ -356,6 +356,13 @@
   const renderSourceRows = (entries, total) => {
     const sourceRows = document.querySelector(".source-bars");
     sourceRows.replaceChildren();
+    if (!entries.length) {
+      const empty = document.createElement("p");
+      empty.className = "empty-data-message";
+      empty.textContent = "Ainda não há eventos para este site.";
+      sourceRows.append(empty);
+      return;
+    }
     entries.forEach(([name, count, color]) => {
       const percentage = total ? Math.round((count / total) * 100) : 0;
       const row = document.createElement("div");
@@ -570,13 +577,11 @@
     });
     const visitorTotal = sessionSources.size;
     document.getElementById("source-total").textContent = formatNumber(visitorTotal);
+    sourceBreakdown = [...domainCounts.entries()].sort((a, b) => b[1] - a[1]);
     renderSourceRows(
-      TRAFFIC_CHANNELS
-        .filter((channel) => channel.always || (channelCounts.get(channel.name) || 0) > 0)
-        .map((channel) => [channel.name, channelCounts.get(channel.name) || 0, channel.color]),
+      sourceBreakdown.slice(0, 12).map(([name, count]) => [name, count, "bar-purple"]),
       visitorTotal,
     );
-    sourceBreakdown = [...domainCounts.entries()].sort((a, b) => b[1] - a[1]);
 
     updateCityPanels(aggregateCityRanking(pageViews));
     renderRecentCities(events);
@@ -813,6 +818,14 @@
     updateCityPanels([], "Entre na sua conta para acompanhar as cidades dos visitantes.");
     renderRecentCities([], "Entre na sua conta para ver as últimas cidades que acessaram o site.");
     renderSourceRows([], 0);
+    const sourceBars = document.querySelector(".source-bars");
+    if (sourceBars) {
+      sourceBars.replaceChildren();
+      const empty = document.createElement("p");
+      empty.className = "empty-data-message";
+      empty.textContent = "Entre na sua conta para ver as origens de tráfego.";
+      sourceBars.append(empty);
+    }
     sourceBreakdown = [];
     const pageList = document.querySelector(".page-list");
     if (pageList) {
@@ -1483,38 +1496,41 @@
   const sourcePopoverList = document.getElementById("source-popover-list");
   const sourcePopoverNote = document.getElementById("source-popover-note");
   sourcePopover.addEventListener("click", () => { sourcePopover.hidden = true; });
-  document.getElementById("show-sources").addEventListener("click", () => {
-    sourcePopoverList.replaceChildren();
-    if (!sourceBreakdown.length) {
-      sourcePopoverList.hidden = true;
-      sourcePopoverNote.textContent = "Entre na sua conta com um site verificado para ver as origens reais de tráfego.";
-    } else {
-      sourcePopoverList.hidden = false;
-      const total = sourceBreakdown.reduce((sum, [, count]) => sum + count, 0);
-      sourceBreakdown.slice(0, 12).forEach(([name, count]) => {
-        const percentage = total ? Math.round((count / total) * 100) : 0;
-        const row = document.createElement("div");
-        row.className = "source-popover-row";
-        const meta = document.createElement("div");
-        meta.className = "source-popover-meta";
-        const label = document.createElement("span");
-        label.textContent = name;
-        const value = document.createElement("strong");
-        value.textContent = `${formatNumber(count)} · ${percentage}%`;
-        meta.append(label, value);
-        const track = document.createElement("div");
-        track.className = "progress-track";
-        const bar = document.createElement("i");
-        bar.className = "bar-purple";
-        bar.style.width = `${percentage}%`;
-        track.append(bar);
-        row.append(meta, track);
-        sourcePopoverList.append(row);
-      });
-      sourcePopoverNote.textContent = "O Google só é separado quando o navegador envia o referrer do Google ou parâmetros de campanha (gclid, utm_source); sem esses sinais, a visita fica em Acesso direto.";
-    }
-    sourcePopover.hidden = false;
-  });
+  const showSourcesButton = document.getElementById("show-sources");
+  if (showSourcesButton) {
+    showSourcesButton.addEventListener("click", () => {
+      sourcePopoverList.replaceChildren();
+      if (!sourceBreakdown.length) {
+        sourcePopoverList.hidden = true;
+        sourcePopoverNote.textContent = "Entre na sua conta com um site verificado para ver as origens reais de tráfego.";
+      } else {
+        sourcePopoverList.hidden = false;
+        const total = sourceBreakdown.reduce((sum, [, count]) => sum + count, 0);
+        sourceBreakdown.slice(0, 12).forEach(([name, count]) => {
+          const percentage = total ? Math.round((count / total) * 100) : 0;
+          const row = document.createElement("div");
+          row.className = "source-popover-row";
+          const meta = document.createElement("div");
+          meta.className = "source-popover-meta";
+          const label = document.createElement("span");
+          label.textContent = name;
+          const value = document.createElement("strong");
+          value.textContent = `${formatNumber(count)} · ${percentage}%`;
+          meta.append(label, value);
+          const track = document.createElement("div");
+          track.className = "progress-track";
+          const bar = document.createElement("i");
+          bar.className = "bar-purple";
+          bar.style.width = `${percentage}%`;
+          track.append(bar);
+          row.append(meta, track);
+          sourcePopoverList.append(row);
+        });
+        sourcePopoverNote.textContent = "O Google só é separado quando o navegador envia o referrer do Google ou parâmetros de campanha (gclid, utm_source); sem esses sinais, a visita fica em Acesso direto.";
+      }
+      sourcePopover.hidden = false;
+    });
+  }
   document.getElementById("show-pages").addEventListener("click", () => showToast("Páginas populares", "Entre com um site para ver as páginas mais acessadas."));
 
   window.setInterval(() => {
